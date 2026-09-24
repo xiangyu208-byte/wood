@@ -43,6 +43,12 @@ public class DetectRecord {
      */
     private String sourceType;
 
+    private String modelMode;
+
+    private Double confidenceThreshold;
+
+    private String inferencePrecision;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

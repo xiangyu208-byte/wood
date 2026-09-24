@@ -1,105 +1,88 @@
 <template>
-  <div class="page-container">
-    <el-card v-if="detailData">
-      <template #header>
-        <span>历史详情</span>
-      </template>
-
-      <div class="summary">
-        <p><strong>记录ID：</strong>{{ detailData.recordId }}</p>
-        <p><strong>图片名称：</strong>{{ detailData.imageName }}</p>
-        <p><strong>状态：</strong>{{ detailData.status }}</p>
-        <p><strong>检测总数：</strong>{{ detailData.totalCount }}</p>
-        <p><strong>创建时间：</strong>{{ detailData.createTime }}</p>
+  <div class="page">
+    <header class="page-heading">
+      <div>
+        <p class="eyebrow">检测档案</p>
+        <h1>记录详情</h1>
+        <p>核验原图、检测结果、模型参数与缺陷置信度。</p>
       </div>
-    </el-card>
+      <div class="actions">
+        <StatusBadge v-if="detailData" :status="detailData.status" />
+        <el-button @click="router.push('/history')">返回历史记录</el-button>
+      </div>
+    </header>
 
-    <el-row :gutter="20" style="margin-top: 20px;" v-if="detailData">
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>原图</span>
-          </template>
-          <img :src="fullImageUrl(detailData.imageUrl)" class="preview-image" />
-        </el-card>
-      </el-col>
-
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>结果图</span>
-          </template>
-          <img :src="fullImageUrl(detailData.resultImageUrl)" class="preview-image" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-card style="margin-top: 20px;" v-if="detailData">
-      <template #header>
-        <span>缺陷明细</span>
+    <section class="surface">
+      <StatePanel v-if="loading" tone="loading" title="正在加载记录" description="正在读取检测图片和缺陷明细。" />
+      <StatePanel v-else-if="loadError" :tone="errorTone" title="记录加载失败" :description="loadError.message">
+        <template #action><el-button type="primary" @click="loadDetail">重新加载</el-button></template>
+      </StatePanel>
+      <template v-else-if="detailData">
+        <ResultDetails :result="detailData" />
+        <div v-if="canRetry" class="retry-row">
+          <div><strong>这条记录未成功完成</strong><p>可重新执行当前批次中的失败和已取消项目。</p></div>
+          <el-button type="primary" :loading="retrying" @click="handleRetry">重试所在批次</el-button>
+        </div>
       </template>
-
-      <el-table :data="detailData.details || []" border style="width: 100%;">
-        <el-table-column prop="className" label="缺陷类别" />
-        <el-table-column prop="confidence" label="置信度" />
-        <el-table-column prop="x1" label="x1" />
-        <el-table-column prop="y1" label="y1" />
-        <el-table-column prop="x2" label="x2" />
-        <el-table-column prop="y2" label="y2" />
-      </el-table>
-    </el-card>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { getDetail } from '../api/detect'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import ResultDetails from '../components/ResultDetails.vue'
+import StatePanel from '../components/StatePanel.vue'
+import StatusBadge from '../components/StatusBadge.vue'
+import { getDetail, retryBatch } from '../api/detect'
 
 const route = useRoute()
+const router = useRouter()
 const detailData = ref(null)
+const loading = ref(true)
+const loadError = ref(null)
+const retrying = ref(false)
+let refreshTimer = null
 
-async function loadDetail() {
+const errorTone = computed(() => ['offline', 'service'].includes(loadError.value?.kind) ? 'offline' : 'error')
+const canRetry = computed(() => detailData.value?.batchNo && ['FAIL', 'CANCELLED'].includes(detailData.value.status))
+
+async function loadDetail(silent = false) {
+  if (!silent) loading.value = true
+  loadError.value = null
   try {
-    const id = route.params.id
-    const res = await getDetail(id)
-    detailData.value = res.data.data
+    const payload = await getDetail(route.params.id)
+    detailData.value = payload.data
+    if (silent && ['PENDING', 'PROCESSING'].includes(payload.data.status)) {
+      refreshTimer = window.setTimeout(() => loadDetail(true), 1200)
+    }
   } catch (error) {
-    ElMessage.error(error?.response?.data?.message || '加载详情失败')
+    loadError.value = error
+  } finally {
+    loading.value = false
   }
 }
 
-function fullImageUrl(url) {
-  if (!url) return ''
-  return new URL(url, window.location.origin).toString()
+async function handleRetry() {
+  retrying.value = true
+  try {
+    await retryBatch(detailData.value.batchNo)
+    ElMessage.success('失败项目已重新进入队列')
+    await loadDetail(true)
+  } catch (error) {
+    ElMessage.error(error.message)
+  } finally {
+    retrying.value = false
+  }
 }
 
-onMounted(() => {
-  loadDetail()
-})
+onMounted(loadDetail)
+onBeforeUnmount(() => { if (refreshTimer) window.clearTimeout(refreshTimer) })
 </script>
 
 <style scoped>
-.page-container {
-  padding: 20px;
-}
-
-.preview-image {
-  width: 100%;
-  max-height: 500px;
-  object-fit: contain;
-  border: 1px solid #ddd;
-}
-
-.summary p {
-  margin: 6px 0;
-}
-
-:deep(.el-card) {
-  background: rgba(255, 255, 255, 0.88);
-  border: none;
-  border-radius: 12px;
-}
-
+.retry-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.retry-row p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 13px; }
+@media (max-width: 600px) { .retry-row { align-items: stretch; flex-direction: column; } }
 </style>

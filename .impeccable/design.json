@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-24T22:00:00+08:00",
+  "title": "Design System: Wood Inspect",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Forest Action", "canonical": "oklch(47% 0.105 153)", "tonalRamp": ["oklch(15% 0.05 153)", "oklch(27% 0.075 153)", "oklch(39% 0.095 153)", "oklch(51% 0.105 153)", "oklch(63% 0.09 153)", "oklch(75% 0.065 153)", "oklch(87% 0.035 153)", "oklch(95% 0.015 153)"] },
+      "accent": { "role": "secondary", "displayName": "Timber Amber", "canonical": "oklch(58% 0.12 73)", "tonalRamp": ["oklch(15% 0.05 73)", "oklch(27% 0.075 73)", "oklch(39% 0.10 73)", "oklch(51% 0.12 73)", "oklch(63% 0.105 73)", "oklch(75% 0.075 73)", "oklch(87% 0.04 73)", "oklch(95% 0.018 73)"] },
+      "canvas": { "role": "neutral", "displayName": "Workshop Canvas", "canonical": "oklch(97% 0.008 145)", "tonalRamp": ["oklch(15% 0.008 145)", "oklch(27% 0.008 145)", "oklch(39% 0.008 145)", "oklch(51% 0.008 145)", "oklch(63% 0.008 145)", "oklch(75% 0.008 145)", "oklch(87% 0.008 145)", "oklch(97% 0.008 145)"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Page Headline", "purpose": "页面任务名称" },
+      "body": { "displayName": "Operational Body", "purpose": "说明、数据和反馈" },
+      "label": { "displayName": "Control Label", "purpose": "表单和状态标签" }
+    },
+    "shadows": [
+      { "name": "ambient-low", "value": "0 10px 30px rgba(25, 52, 36, 0.08)", "purpose": "页面级工作表面" },
+      { "name": "interactive-lift", "value": "0 8px 20px rgba(25, 52, 36, 0.12)", "purpose": "可点击条目的悬停反馈" }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "150 至 250 毫秒状态转换" }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "430px" },
+      { "name": "tablet", "value": "700px" },
+      { "name": "compact-desktop", "value": "980px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "提交识别、重试和主要恢复操作。",
+      "html": "<button class=\"ds-btn-primary\">开始识别</button>",
+      "css": ".ds-btn-primary{min-height:42px;padding:10px 18px;border:0;border-radius:6px;background:var(--color-primary,#276749);color:#fbfcfa;font:650 14px system-ui;transition:background 180ms cubic-bezier(.16,1,.3,1)}.ds-btn-primary:hover{background:var(--color-primary-deep,#1f513b)}.ds-btn-primary:focus-visible{outline:3px solid rgba(39,103,73,.28);outline-offset:3px}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "description": "以文字、圆点和语义色共同表达任务状态。",
+      "html": "<span class=\"ds-status\"><span></span>识别成功</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:4px 10px;border-radius:999px;background:#e7f3eb;color:#287a50;font:650 13px system-ui}.ds-status span{width:8px;height:8px;border-radius:50%;background:currentColor}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "description": "用于历史筛选和参数输入。",
+      "html": "<input class=\"ds-input\" placeholder=\"输入文件名\">",
+      "css": ".ds-input{min-height:42px;padding:0 12px;border:1px solid #d4ddd6;border-radius:6px;background:#fbfcfa;color:#17231c;font:14px system-ui}.ds-input:focus{border-color:#276749;outline:3px solid rgba(39,103,73,.18)}"
+    },
+    {
+      "name": "Application Navigation",
+      "kind": "nav",
+      "description": "保留文字标签的桌面与移动主导航。",
+      "html": "<nav class=\"ds-nav\"><a class=\"active\">在线识别</a><a>摄像头</a><a>历史记录</a></nav>",
+      "css": ".ds-nav{display:flex;gap:4px}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;color:#5c6b62;font:600 14px system-ui}.ds-nav a.active{background:#276749;color:#fbfcfa}"
+    },
+    {
+      "name": "Work Surface",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "承载单个工作阶段，不嵌套同类卡片。",
+      "html": "<section class=\"ds-surface\"><strong>选择待识别图片</strong><p>支持 JPG、JPEG、PNG</p></section>",
+      "css": ".ds-surface{padding:24px;border:1px solid #d4ddd6;border-radius:14px;background:#fbfcfa;color:#17231c;box-shadow:0 10px 30px rgba(25,52,36,.08);font:15px/1.6 system-ui}.ds-surface p{margin:6px 0 0;color:#5c6b62}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Inspection Bench",
+    "overview": "界面模拟白天车间或实验室里的一张整洁质检台：背景安静，工具位置稳定，图片和状态是绝对主角。整体采用受木材与林业启发但不过度拟物的暖绿色体系，以适中的信息密度服务重复操作。",
+    "keyCharacteristics": ["浅色、克制、适合长时间查看图片和表格。", "状态同时使用文字、形状和语义色，不只依赖颜色。", "高级设置渐进展开，默认流程保持直接。", "44 像素以上触控目标和清晰键盘焦点。"],
+    "rules": [
+      { "name": "The Sparse Accent Rule", "body": "主色只用于主要操作、当前选择和状态提示，不作为装饰填满界面。", "section": "colors" },
+      { "name": "The Calm Hierarchy Rule", "body": "标题通过字号和字重区分，禁止渐变文字、全大写长标签和装饰性字体。", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "阴影表达层级或交互状态，不用于每一个容器。", "section": "elevation" }
+    ],
+    "dos": ["Do 在所有关键状态旁显示中文文字，不依赖颜色解释结果。", "Do 为加载、空数据、网络离线和服务不可用提供不同文案及恢复入口。", "Do 在 768px 以下将图片双栏改为单栏、历史表格改为条目列表。", "Do 保持所有主要触控目标至少 44px，并提供清晰 :focus-visible 状态。"],
+    "donts": ["Don't 使用默认 Vue 示例页面的通用绿色和双栏模板感。", "Don't 使用会妨碍图片与表格阅读的高对比摄影背景、玻璃拟态和大面积透明卡片。", "Don't 使用只有颜色、没有文字的状态表达。", "Don't 把识别失败、网络离线或任务取消包装成成功结果。", "Don't 为标准表单、表格和导航发明陌生交互。", "Don't 使用大于 1px 的彩色侧边条、渐变文字或嵌套卡片。"]
+  }
+}

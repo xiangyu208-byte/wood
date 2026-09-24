@@ -1,9 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import DetectView from '../views/DetectView.vue'
-import CameraDetectView from '../views/CameraDetectView.vue'
-import HistoryView from '../views/HistoryView.vue'
-import HistoryDetailView from '../views/HistoryDetailView.vue'
-
 const routes = [
   {
     path: '/',
@@ -12,22 +7,22 @@ const routes = [
   {
     path: '/detect',
     name: 'Detect',
-    component: DetectView
+    component: () => import('../views/DetectView.vue')
   },
   {
     path: '/camera-detect',
     name: 'CameraDetect',
-    component: CameraDetectView
+    component: () => import('../views/CameraDetectView.vue')
   },
   {
     path: '/history',
     name: 'History',
-    component: HistoryView
+    component: () => import('../views/HistoryView.vue')
   },
   {
     path: '/history/:id',
     name: 'HistoryDetail',
-    component: HistoryDetailView,
+    component: () => import('../views/HistoryDetailView.vue'),
     props: true
   }
 ]

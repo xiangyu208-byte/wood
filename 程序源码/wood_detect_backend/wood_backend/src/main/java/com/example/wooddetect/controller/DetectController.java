@@ -1,6 +1,7 @@
 package com.example.wooddetect.controller;
 
 import com.example.wooddetect.common.Result;
+import com.example.wooddetect.dto.DetectionOptionsDTO;
 import com.example.wooddetect.service.DetectService;
 import com.example.wooddetect.vo.BatchTaskVO;
 import com.example.wooddetect.vo.DetectHistoryVO;
@@ -27,8 +28,13 @@ public class DetectController {
      * 单张图片上传并识别
      */
     @PostMapping("/upload")
-    public Result<DetectResponseVO> upload(@RequestParam("file") MultipartFile file) {
-        DetectResponseVO vo = detectService.uploadAndDetect(file);
+    public Result<DetectResponseVO> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "STANDARD") String modelMode,
+            @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
+            @RequestParam(defaultValue = "AUTO") String precision) {
+        DetectResponseVO vo = detectService.uploadAndDetect(
+                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
         return Result.success("图片上传并识别成功", vo);
     }
 
@@ -36,8 +42,13 @@ public class DetectController {
      * 批量图片上传并识别
      */
     @PostMapping("/batch-upload")
-    public Result<List<DetectResponseVO>> batchUpload(@RequestParam("files") MultipartFile[] files) {
-        List<DetectResponseVO> result = detectService.batchUploadAndDetect(files);
+    public Result<List<DetectResponseVO>> batchUpload(
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam(defaultValue = "STANDARD") String modelMode,
+            @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
+            @RequestParam(defaultValue = "AUTO") String precision) {
+        List<DetectResponseVO> result = detectService.batchUploadAndDetect(
+                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
         return Result.success("批量图片上传并识别成功", result);
     }
 
@@ -46,8 +57,12 @@ public class DetectController {
      */
     @PostMapping("/batch-upload-async")
     public ResponseEntity<Result<BatchTaskVO>> batchUploadAsync(
-            @RequestParam("files") MultipartFile[] files) {
-        BatchTaskVO task = detectService.createAsyncBatch(files);
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam(defaultValue = "STANDARD") String modelMode,
+            @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
+            @RequestParam(defaultValue = "AUTO") String precision) {
+        BatchTaskVO task = detectService.createAsyncBatch(
+                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(Result.success("批量任务已创建", task));
     }
@@ -58,6 +73,17 @@ public class DetectController {
     @GetMapping("/batch-status/{batchNo}")
     public Result<BatchTaskVO> batchStatus(@PathVariable String batchNo) {
         return Result.success(detectService.getBatchStatus(batchNo));
+    }
+
+    @PostMapping("/batch-cancel/{batchNo}")
+    public Result<BatchTaskVO> cancelBatch(@PathVariable String batchNo) {
+        return Result.success("批量任务已取消", detectService.cancelBatch(batchNo));
+    }
+
+    @PostMapping("/batch-retry/{batchNo}")
+    public ResponseEntity<Result<BatchTaskVO>> retryBatch(@PathVariable String batchNo) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(Result.success("失败项目已重新进入队列", detectService.retryBatch(batchNo)));
     }
 
     /**
@@ -156,8 +182,13 @@ public class DetectController {
     }
 
     @PostMapping("/camera-upload")
-    public Result<DetectResponseVO> cameraUpload(@RequestParam("file") MultipartFile file) {
-        DetectResponseVO vo = detectService.cameraUploadAndDetect(file);
+    public Result<DetectResponseVO> cameraUpload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "STANDARD") String modelMode,
+            @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
+            @RequestParam(defaultValue = "AUTO") String precision) {
+        DetectResponseVO vo = detectService.cameraUploadAndDetect(
+                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
         return Result.success("摄像头图片识别成功", vo);
     }
 

@@ -13,6 +13,8 @@
 ~$*.pptx
 .DS_Store
 Thumbs.db
+/.playwright-cli/
+/output/playwright/
 
 # 仅供本地参考，不上传到 GitHub
 /参考ppt.pptx

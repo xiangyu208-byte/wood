@@ -6,6 +6,7 @@ import com.example.wooddetect.common.BusinessException;
 import com.example.wooddetect.common.DetectionStatus;
 import com.example.wooddetect.common.InferenceServiceException;
 import com.example.wooddetect.config.FileUploadProperties;
+import com.example.wooddetect.dto.DetectionOptionsDTO;
 import com.example.wooddetect.dto.PythonDetectResponseDTO;
 import com.example.wooddetect.entity.DetectBatch;
 import com.example.wooddetect.entity.DetectDetail;
@@ -58,8 +59,11 @@ public class DetectServiceImpl implements DetectService {
     private static final Logger log = LoggerFactory.getLogger(DetectServiceImpl.class);
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Set<String> RECORD_STATUSES = Set.of(
-            DetectionStatus.PENDING, DetectionStatus.PROCESSING, DetectionStatus.SUCCESS, DetectionStatus.FAIL);
+            DetectionStatus.PENDING, DetectionStatus.PROCESSING, DetectionStatus.SUCCESS,
+            DetectionStatus.FAIL, DetectionStatus.CANCELLED);
     private static final Set<String> SOURCE_TYPES = Set.of("UPLOAD", "CAMERA");
+    private static final Set<String> MODEL_MODES = Set.of("FAST", "STANDARD", "ACCURATE");
+    private static final Set<String> INFERENCE_PRECISIONS = Set.of("AUTO", "FP32", "FP16");
 
     private final DetectRecordMapper detectRecordMapper;
     private final DetectDetailMapper detectDetailMapper;
@@ -91,26 +95,27 @@ public class DetectServiceImpl implements DetectService {
     }
 
     @Override
-    public DetectResponseVO uploadAndDetect(MultipartFile file) {
+    public DetectResponseVO uploadAndDetect(MultipartFile file, DetectionOptionsDTO rawOptions) {
         fileStorageService.validateImage(file);
-        return processNewFile(file, null, "UPLOAD", true);
+        return processNewFile(file, null, "UPLOAD", normalizeOptions(rawOptions), true);
     }
 
     @Override
-    public DetectResponseVO cameraUploadAndDetect(MultipartFile file) {
+    public DetectResponseVO cameraUploadAndDetect(MultipartFile file, DetectionOptionsDTO rawOptions) {
         fileStorageService.validateImage(file);
-        return processNewFile(file, "CAMERA_" + newBatchSuffix(), "CAMERA", true);
+        return processNewFile(file, "CAMERA_" + newBatchSuffix(), "CAMERA", normalizeOptions(rawOptions), true);
     }
 
     @Override
-    public List<DetectResponseVO> batchUploadAndDetect(MultipartFile[] files) {
+    public List<DetectResponseVO> batchUploadAndDetect(MultipartFile[] files, DetectionOptionsDTO rawOptions) {
         validateBatch(files);
+        DetectionOptionsDTO options = normalizeOptions(rawOptions);
         String batchNo = "BATCH_" + newBatchSuffix();
         DetectBatch batch = createBatch(batchNo, files.length, DetectionStatus.BATCH_PROCESSING);
         List<DetectResponseVO> results = new ArrayList<>();
 
         for (MultipartFile file : files) {
-            DetectResponseVO result = processNewFile(file, batchNo, "UPLOAD", false);
+            DetectResponseVO result = processNewFile(file, batchNo, "UPLOAD", options, false);
             results.add(result);
             updateBatchProgress(batch.getId(), DetectionStatus.SUCCESS.equals(result.getStatus()));
         }
@@ -119,8 +124,9 @@ public class DetectServiceImpl implements DetectService {
     }
 
     @Override
-    public BatchTaskVO createAsyncBatch(MultipartFile[] files) {
+    public BatchTaskVO createAsyncBatch(MultipartFile[] files, DetectionOptionsDTO rawOptions) {
         validateBatch(files);
+        DetectionOptionsDTO options = normalizeOptions(rawOptions);
         String batchNo = "ASYNC_" + newBatchSuffix();
         DetectBatch batch = createBatch(batchNo, files.length, DetectionStatus.BATCH_PENDING);
         List<Long> recordIds = new ArrayList<>();
@@ -130,7 +136,7 @@ public class DetectServiceImpl implements DetectService {
             for (MultipartFile file : files) {
                 FileStorageService.StoredImage stored = fileStorageService.storeImage(file, "original");
                 storedPaths.add(stored.absolutePath());
-                DetectRecord record = createRecord(stored, batchNo, "UPLOAD", DetectionStatus.PENDING);
+                DetectRecord record = createRecord(stored, batchNo, "UPLOAD", options, DetectionStatus.PENDING);
                 recordIds.add(record.getId());
             }
         } catch (Exception e) {
@@ -173,6 +179,7 @@ public class DetectServiceImpl implements DetectService {
         vo.setProcessedCount(batch.getProcessedCount());
         vo.setSuccessCount(batch.getSuccessCount());
         vo.setFailCount(batch.getFailCount());
+        vo.setCancelledCount(batch.getCancelledCount());
         vo.setStatus(batch.getStatus());
         vo.setCreateTime(batch.getCreateTime());
         vo.setUpdateTime(batch.getUpdateTime());
@@ -180,9 +187,106 @@ public class DetectServiceImpl implements DetectService {
         return vo;
     }
 
+    @Override
+    public BatchTaskVO cancelBatch(String batchNo) {
+        DetectBatch batch = requireBatch(batchNo);
+        if (Set.of(DetectionStatus.BATCH_SUCCESS, DetectionStatus.BATCH_FAIL,
+                DetectionStatus.BATCH_PARTIAL_FAIL, DetectionStatus.BATCH_CANCELLED).contains(batch.getStatus())) {
+            if (DetectionStatus.BATCH_CANCELLED.equals(batch.getStatus())) {
+                return getBatchStatus(batch.getBatchNo());
+            }
+            throw new BusinessException(HttpStatus.CONFLICT, "已结束的批量任务不能取消");
+        }
+
+        transactionTemplate.executeWithoutResult(status -> {
+            List<DetectRecord> pending = detectRecordMapper.selectList(
+                    new QueryWrapper<DetectRecord>()
+                            .eq("batch_no", batch.getBatchNo())
+                            .eq("status", DetectionStatus.PENDING));
+            LocalDateTime now = LocalDateTime.now();
+            for (DetectRecord record : pending) {
+                record.setStatus(DetectionStatus.CANCELLED);
+                record.setErrorMessage("用户取消任务");
+                record.setUpdateTime(now);
+                detectRecordMapper.updateById(record);
+            }
+            DetectBatch latest = detectBatchMapper.selectById(batch.getId());
+            if (latest != null) {
+                latest.setProcessedCount(Math.min(latest.getTotalCount(), latest.getProcessedCount() + pending.size()));
+                latest.setCancelledCount(latest.getCancelledCount() + pending.size());
+                latest.setStatus(DetectionStatus.BATCH_CANCELLED);
+                latest.setUpdateTime(now);
+                detectBatchMapper.updateById(latest);
+            }
+        });
+        return getBatchStatus(batch.getBatchNo());
+    }
+
+    @Override
+    public BatchTaskVO retryBatch(String batchNo) {
+        DetectBatch batch = requireBatch(batchNo);
+        long processingCount = detectRecordMapper.selectCount(
+                new QueryWrapper<DetectRecord>()
+                        .eq("batch_no", batch.getBatchNo())
+                        .eq("status", DetectionStatus.PROCESSING));
+        if (processingCount > 0 || DetectionStatus.BATCH_PENDING.equals(batch.getStatus())
+                || DetectionStatus.BATCH_PROCESSING.equals(batch.getStatus())) {
+            throw new BusinessException(HttpStatus.CONFLICT, "任务仍在处理中，请结束后再重试");
+        }
+
+        List<DetectRecord> retryRecords = detectRecordMapper.selectList(
+                new QueryWrapper<DetectRecord>()
+                        .eq("batch_no", batch.getBatchNo())
+                        .in("status", List.of(DetectionStatus.FAIL, DetectionStatus.CANCELLED))
+                        .orderByAsc("id"));
+        if (retryRecords.isEmpty()) {
+            throw new BusinessException(HttpStatus.CONFLICT, "当前批次没有可重试的失败或已取消项目");
+        }
+
+        List<Long> retryIds = retryRecords.stream().map(DetectRecord::getId).toList();
+        transactionTemplate.executeWithoutResult(status -> {
+            LocalDateTime now = LocalDateTime.now();
+            for (DetectRecord record : retryRecords) {
+                detectDetailMapper.delete(new QueryWrapper<DetectDetail>().eq("record_id", record.getId()));
+                fileStorageService.deleteManagedFile(record.getResultImagePath());
+                record.setResultImagePath(null);
+                record.setResultImageUrl(null);
+                record.setTotalCount(0);
+                record.setStatus(DetectionStatus.PENDING);
+                record.setErrorMessage(null);
+                record.setUpdateTime(now);
+                detectRecordMapper.updateById(record);
+            }
+
+            long successCount = detectRecordMapper.selectCount(
+                    new QueryWrapper<DetectRecord>()
+                            .eq("batch_no", batch.getBatchNo())
+                            .eq("status", DetectionStatus.SUCCESS));
+            DetectBatch latest = detectBatchMapper.selectById(batch.getId());
+            latest.setProcessedCount((int) successCount);
+            latest.setSuccessCount((int) successCount);
+            latest.setFailCount(0);
+            latest.setCancelledCount(0);
+            latest.setStatus(DetectionStatus.BATCH_PENDING);
+            latest.setUpdateTime(now);
+            detectBatchMapper.updateById(latest);
+        });
+
+        try {
+            detectionTaskExecutor.execute(() -> processQueuedBatch(batch.getId(), retryIds));
+        } catch (RuntimeException e) {
+            markBatchAndRecordsFailed(batch.getId(), retryIds, "批量任务无法进入执行队列");
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, "批量任务队列已满，请稍后重试", e);
+        }
+        return getBatchStatus(batch.getBatchNo());
+    }
+
     private void processQueuedBatch(Long batchId, List<Long> recordIds) {
         setBatchStatus(batchId, DetectionStatus.BATCH_PROCESSING);
         for (Long recordId : recordIds) {
+            if (isBatchCancelled(batchId)) {
+                break;
+            }
             try {
                 setRecordStatus(recordId, DetectionStatus.PROCESSING, null);
                 DetectResponseVO result = processExistingRecord(recordId, false);
@@ -193,15 +297,21 @@ public class DetectServiceImpl implements DetectService {
                 updateBatchProgress(batchId, false);
             }
         }
-        finalizeBatch(batchId);
+        if (!isBatchCancelled(batchId)) {
+            finalizeBatch(batchId);
+        }
     }
 
     private DetectResponseVO processNewFile(
-            MultipartFile file, String batchNo, String sourceType, boolean throwOnInferenceFailure) {
+            MultipartFile file,
+            String batchNo,
+            String sourceType,
+            DetectionOptionsDTO options,
+            boolean throwOnInferenceFailure) {
         FileStorageService.StoredImage stored = fileStorageService.storeImage(file, "original");
         DetectRecord record;
         try {
-            record = createRecord(stored, batchNo, sourceType, DetectionStatus.PROCESSING);
+            record = createRecord(stored, batchNo, sourceType, options, DetectionStatus.PROCESSING);
         } catch (Exception e) {
             fileStorageService.deleteManagedFile(stored.absolutePath());
             throw e;
@@ -213,7 +323,7 @@ public class DetectServiceImpl implements DetectService {
         DetectRecord record = requireRecord(recordId);
         PythonDetectResponseDTO response = null;
         try {
-            response = pythonDetectClient.detect(record.getImagePath());
+            response = pythonDetectClient.detect(record.getImagePath(), optionsFromRecord(record));
             validateInferenceResponse(response);
             persistSuccess(recordId, response);
             return getDetail(recordId);
@@ -244,7 +354,11 @@ public class DetectServiceImpl implements DetectService {
     }
 
     private DetectRecord createRecord(
-            FileStorageService.StoredImage stored, String batchNo, String sourceType, String status) {
+            FileStorageService.StoredImage stored,
+            String batchNo,
+            String sourceType,
+            DetectionOptionsDTO options,
+            String status) {
         DetectRecord record = new DetectRecord();
         LocalDateTime now = LocalDateTime.now();
         record.setImageName(stored.originalName());
@@ -254,6 +368,9 @@ public class DetectServiceImpl implements DetectService {
         record.setStatus(status);
         record.setBatchNo(batchNo);
         record.setSourceType(sourceType);
+        record.setModelMode(options.getModelMode());
+        record.setConfidenceThreshold(options.getConfidenceThreshold());
+        record.setInferencePrecision(options.getInferencePrecision());
         record.setCreateTime(now);
         record.setUpdateTime(now);
         transactionTemplate.executeWithoutResult(transactionStatus -> detectRecordMapper.insert(record));
@@ -560,6 +677,7 @@ public class DetectServiceImpl implements DetectService {
         batch.setProcessedCount(0);
         batch.setSuccessCount(0);
         batch.setFailCount(0);
+        batch.setCancelledCount(0);
         batch.setStatus(status);
         batch.setCreateTime(now);
         batch.setUpdateTime(now);
@@ -590,6 +708,9 @@ public class DetectServiceImpl implements DetectService {
             if (batch == null) {
                 return;
             }
+            if (DetectionStatus.BATCH_CANCELLED.equals(batch.getStatus())) {
+                return;
+            }
             if (batch.getSuccessCount() == batch.getTotalCount()) {
                 batch.setStatus(DetectionStatus.BATCH_SUCCESS);
             } else if (batch.getFailCount() == batch.getTotalCount()) {
@@ -606,6 +727,10 @@ public class DetectServiceImpl implements DetectService {
         transactionTemplate.executeWithoutResult(transactionStatus -> {
             DetectBatch batch = detectBatchMapper.selectById(batchId);
             if (batch != null) {
+                if (DetectionStatus.BATCH_CANCELLED.equals(batch.getStatus())
+                        && !DetectionStatus.BATCH_CANCELLED.equals(status)) {
+                    return;
+                }
                 batch.setStatus(status);
                 batch.setUpdateTime(LocalDateTime.now());
                 detectBatchMapper.updateById(batch);
@@ -626,9 +751,25 @@ public class DetectServiceImpl implements DetectService {
             }
             DetectBatch batch = detectBatchMapper.selectById(batchId);
             if (batch != null) {
-                batch.setProcessedCount(batch.getTotalCount());
-                batch.setFailCount(batch.getTotalCount());
-                batch.setStatus(DetectionStatus.BATCH_FAIL);
+                long successCount = detectRecordMapper.selectCount(
+                        new QueryWrapper<DetectRecord>()
+                                .eq("batch_no", batch.getBatchNo())
+                                .eq("status", DetectionStatus.SUCCESS));
+                long failCount = detectRecordMapper.selectCount(
+                        new QueryWrapper<DetectRecord>()
+                                .eq("batch_no", batch.getBatchNo())
+                                .eq("status", DetectionStatus.FAIL));
+                long cancelledCount = detectRecordMapper.selectCount(
+                        new QueryWrapper<DetectRecord>()
+                                .eq("batch_no", batch.getBatchNo())
+                                .eq("status", DetectionStatus.CANCELLED));
+                batch.setSuccessCount((int) successCount);
+                batch.setFailCount((int) failCount);
+                batch.setCancelledCount((int) cancelledCount);
+                batch.setProcessedCount((int) (successCount + failCount + cancelledCount));
+                batch.setStatus(successCount > 0
+                        ? DetectionStatus.BATCH_PARTIAL_FAIL
+                        : DetectionStatus.BATCH_FAIL);
                 batch.setUpdateTime(LocalDateTime.now());
                 detectBatchMapper.updateById(batch);
             }
@@ -648,6 +789,48 @@ public class DetectServiceImpl implements DetectService {
         }
     }
 
+    private DetectionOptionsDTO normalizeOptions(DetectionOptionsDTO rawOptions) {
+        String mode = rawOptions == null || !hasText(rawOptions.getModelMode())
+                ? "STANDARD" : rawOptions.getModelMode().trim().toUpperCase();
+        String precision = rawOptions == null || !hasText(rawOptions.getInferencePrecision())
+                ? "AUTO" : rawOptions.getInferencePrecision().trim().toUpperCase();
+        Double confidence = rawOptions == null || rawOptions.getConfidenceThreshold() == null
+                ? 0.25 : rawOptions.getConfidenceThreshold();
+
+        if (!MODEL_MODES.contains(mode)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "modelMode 仅支持 FAST、STANDARD 或 ACCURATE");
+        }
+        if (!INFERENCE_PRECISIONS.contains(precision)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "precision 仅支持 AUTO、FP32 或 FP16");
+        }
+        if (!Double.isFinite(confidence) || confidence < 0.05 || confidence > 0.95) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "confidenceThreshold 必须在 0.05 到 0.95 之间");
+        }
+        return new DetectionOptionsDTO(mode, confidence, precision);
+    }
+
+    private DetectionOptionsDTO optionsFromRecord(DetectRecord record) {
+        return normalizeOptions(new DetectionOptionsDTO(
+                record.getModelMode(), record.getConfidenceThreshold(), record.getInferencePrecision()));
+    }
+
+    private DetectBatch requireBatch(String batchNo) {
+        if (!hasText(batchNo)) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "批次号不能为空");
+        }
+        DetectBatch batch = detectBatchMapper.selectOne(
+                new QueryWrapper<DetectBatch>().eq("batch_no", batchNo.trim()).last("LIMIT 1"));
+        if (batch == null) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, "批量任务不存在");
+        }
+        return batch;
+    }
+
+    private boolean isBatchCancelled(Long batchId) {
+        DetectBatch batch = detectBatchMapper.selectById(batchId);
+        return batch != null && DetectionStatus.BATCH_CANCELLED.equals(batch.getStatus());
+    }
+
     private DetectRecord requireRecord(Long id) {
         if (id == null || id <= 0) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "记录 ID 不合法");
@@ -664,6 +847,9 @@ public class DetectServiceImpl implements DetectService {
         vo.setRecordId(record.getId());
         vo.setBatchNo(record.getBatchNo());
         vo.setSourceType(record.getSourceType());
+        vo.setModelMode(record.getModelMode());
+        vo.setConfidenceThreshold(record.getConfidenceThreshold());
+        vo.setInferencePrecision(record.getInferencePrecision());
         vo.setImageName(record.getImageName());
         vo.setImageUrl(record.getImageUrl());
         vo.setResultImageUrl(record.getResultImageUrl());
@@ -685,6 +871,9 @@ public class DetectServiceImpl implements DetectService {
         vo.setStatus(record.getStatus());
         vo.setErrorMessage(record.getErrorMessage());
         vo.setSourceType(record.getSourceType());
+        vo.setModelMode(record.getModelMode());
+        vo.setConfidenceThreshold(record.getConfidenceThreshold());
+        vo.setInferencePrecision(record.getInferencePrecision());
         vo.setCreateTime(record.getCreateTime());
         vo.setDetails(details.stream().map(this::toDetailVO).toList());
         return vo;

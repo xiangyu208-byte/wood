@@ -53,6 +53,15 @@ public class DetectResponseVO {
      */
     private String sourceType;
 
+    /** 推理模式：FAST / STANDARD / ACCURATE */
+    private String modelMode;
+
+    /** 置信度阈值 */
+    private Double confidenceThreshold;
+
+    /** 推理精度：AUTO / FP32 / FP16 */
+    private String inferencePrecision;
+
     /**
      * 识别时间
      */

@@ -12,4 +12,10 @@ public class PythonDetectRequestDTO {
      * 原图在服务器磁盘上的真实路径
      */
     private String imagePath;
+
+    private String modelMode;
+
+    private Double confidenceThreshold;
+
+    private String precision;
 }

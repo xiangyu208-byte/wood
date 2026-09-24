@@ -19,6 +19,7 @@ public class DetectBatch {
     private Integer processedCount;
     private Integer successCount;
     private Integer failCount;
+    private Integer cancelledCount;
     private String status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

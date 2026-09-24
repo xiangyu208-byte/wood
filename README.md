@@ -4,12 +4,14 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 
 项目采用前后端分离架构，默认提供无需 CUDA 的 CPU 容器方案，同时保留 NVIDIA GPU 推理方案。Windows、Linux 和 macOS 可使用 Docker Compose 部署，手机和平板可作为浏览器客户端访问。
 
-> 当前仓库仍处于持续开发阶段。第一、二阶段已经完成：工程可容器化运行，数据库迁移、文件安全、任务状态、异常处理和数据库分页等后端可靠性能力已落地。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
+> 当前仓库仍处于持续开发阶段。前三个阶段已经完成：工程可容器化运行，后端可靠性能力已落地，前端已接入异步任务、异常恢复、响应式布局与生产拆包。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
 
 ## 主要功能
 
 - 单张图片上传识别，并展示带检测框的结果图。
 - 多张图片同步识别，以及带总进度和逐项状态的异步批量任务。
+- 支持取消异步批次、重试失败/取消项目，以及单张重新识别。
+- 支持快速、标准、精确三种输入模式，可设置置信度阈值与 AUTO/FP32/FP16 推理精度。
 - 浏览器摄像头拍照识别。
 - 展示缺陷类别、置信度和边界框坐标。
 - 保存检测记录、原图、结果图和缺陷明细。
@@ -22,6 +24,7 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 - 提供统一错误响应、正确 HTTP 状态码和 OpenAPI/Swagger 文档。
 - 提供 CPU 和 NVIDIA GPU 两种推理容器。
 - 提供服务健康检查、数据库自动建表和持久化数据卷。
+- 前端统一处理业务错误、超时、断网和服务不可用，并提供桌面、平板和手机响应式布局。
 
 当前模型识别以下 6 类木材表面缺陷：
 
@@ -229,6 +232,8 @@ cp .env.example .env
 | `POST` | `/api/detect/batch-upload` | 批量上传并识别 |
 | `POST` | `/api/detect/batch-upload-async` | 创建异步批量识别任务，HTTP 202 |
 | `GET` | `/api/detect/batch-status/{batchNo}` | 查询批次总进度和逐项状态 |
+| `POST` | `/api/detect/batch-cancel/{batchNo}` | 取消尚未完成的异步批次 |
+| `POST` | `/api/detect/batch-retry/{batchNo}` | 重试批次中的失败和已取消项目，HTTP 202 |
 | `POST` | `/api/detect/camera-upload` | 上传摄像头截图并识别 |
 | `GET` | `/api/detect/history` | 分页查询历史记录 |
 | `GET` | `/api/detect/{id}` | 查询检测详情 |
@@ -272,6 +277,7 @@ docker compose down -v
 ```bash
 cd 程序源码/wood_detect_frontend
 npm ci
+npm test
 npm run dev
 ```
 
@@ -317,12 +323,16 @@ python detect.py
 - Windows、Linux、macOS 启停脚本。
 - 前端生产构建和依赖漏洞处理。
 - Git 与 GitHub 版本管理。
-- Flyway V1/V2 数据库自动迁移和批次表。
+- Flyway V1/V2/V3 数据库自动迁移、批次表和推理参数字段。
 - UUID 文件存储、图片真实性/尺寸校验和删除补偿。
-- `PENDING / PROCESSING / SUCCESS / FAIL` 状态闭环、推理超时与重试。
+- `PENDING / PROCESSING / SUCCESS / FAIL / CANCELLED` 状态闭环、推理超时与重试。
 - HTTP 错误语义、统一错误结构、数据库原生分页和一致筛选条件。
 - 异步批量任务、逐项进度、Swagger 文档、Maven Wrapper 和可执行 JAR。
 - 后端文件存储单元测试，以及 Docker 下 Flyway、API、万条分页的阶段验收。
+- 异步批次进度、取消、失败项重试和单张重新识别前端流程。
+- 统一 Axios 异常拦截、加载/空数据/断网/服务不可用状态和失败原因展示。
+- 手机/平板响应式布局、键盘焦点、语义标签、减少动效支持和中文缺陷名称。
+- 路由懒加载、Element Plus 按需注册和静态图片 WebP 压缩；生产构建无超大资源警告。
 
 后续重点：
 
@@ -336,10 +346,9 @@ python detect.py
 ## 已知限制
 
 - 当前仓库未包含训练数据集，因此不能直接完整复现模型训练。
-- 前端背景图片和生产 JavaScript 包仍需要在后续阶段压缩、拆分。
 - 跨平台配置已经建立，但 Windows、Linux、macOS 和移动浏览器仍需完成正式验收矩阵。
 - 当前 PyTorch 模型推理依赖 Ultralytics；ONNX 跨平台模型尚未提供。
-- 前端尚未接入新的异步批次进度接口；目前仍以同步批量操作为主。
+- FP16 仅适用于 CUDA 推理环境；CPU 模式请选择 AUTO 或 FP32。
 
 ## 许可证说明
 

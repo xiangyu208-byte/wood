@@ -21,6 +21,9 @@ public class DetectHistoryVO {
      * 来源类型：UPLOAD / CAMERA
      */
     private String sourceType;
+    private String modelMode;
+    private Double confidenceThreshold;
+    private String inferencePrecision;
 
     /**
      * 原始文件名

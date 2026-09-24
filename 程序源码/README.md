@@ -120,6 +120,10 @@ Swagger 文档位于 <http://localhost:8080/swagger-ui.html>，OpenAPI JSON 位�
 
 - `POST /api/detect/batch-upload-async`：创建任务并返回 HTTP 202。
 - `GET /api/detect/batch-status/{batchNo}`：读取总体进度、成功/失败数量及逐项状态。
+- `POST /api/detect/batch-cancel/{batchNo}`：取消等待处理的项目，并保留已完成结果。
+- `POST /api/detect/batch-retry/{batchNo}`：重新执行失败或已取消的项目。
+
+上传与摄像头接口还接受 `modelMode=FAST|STANDARD|ACCURATE`、`confidenceThreshold=0.05..0.95` 和 `precision=AUTO|FP32|FP16`。FP16 仅用于 CUDA 推理服务。
 
 查看状态和日志：
 
@@ -170,6 +174,7 @@ $env:DB_PASSWORD='your_password'
 ```bash
 cd wood_detect_frontend
 npm ci
+npm test
 npm run dev
 ```
 
@@ -191,6 +196,6 @@ python detect.py
 
 ## 当前完成范围与边界
 
-第一、二阶段已完成工程标准化、跨平台容器配置和后端可靠性改造，包括 Flyway、UUID 文件名、严格图片校验、数据库分页、状态闭环、超时重试、异步批次进度、统一错误响应、Swagger 和文件存储单元测试。
+前三阶段已完成工程标准化、跨平台容器配置、后端可靠性和前端体验改造，包括 Flyway、UUID 文件名、严格图片校验、数据库分页、状态闭环、超时重试、异步批次进度与取消重试、统一错误响应、Swagger、响应式界面、异常恢复、路由拆包和文件存储/前端状态单元测试。
 
-后续仍需完成前端异步进度展示、前端资源优化、统一模型训练/验证流程、ONNX 推理、更完整的集成与端到端测试，以及 Linux/macOS/移动浏览器的正式验收矩阵。
+后续仍需完成统一模型训练/验证流程、ONNX 推理、更完整的集成与端到端测试，以及 Linux/macOS/移动浏览器的正式验收矩阵。

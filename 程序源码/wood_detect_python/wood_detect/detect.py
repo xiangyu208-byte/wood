@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from pathlib import Path
-from typing import List, Union
+from typing import List, Literal, Union
 import cv2
 import torch
 import os
@@ -48,6 +48,9 @@ model = YOLO(str(MODEL_PATH))
 # =========================
 class PredictRequest(BaseModel):
     imagePath: str
+    modelMode: Literal["FAST", "STANDARD", "ACCURATE"] = "STANDARD"
+    confidenceThreshold: float = Field(default=CONFIDENCE_THRESHOLD, ge=0.05, le=0.95)
+    precision: Literal["AUTO", "FP32", "FP16"] = "AUTO"
 
 
 class DetectItem(BaseModel):
@@ -100,6 +103,25 @@ def resolve_device() -> Union[int, str]:
     return MODEL_DEVICE
 
 
+def resolve_inference_size(mode: str) -> int:
+    """将前端可理解的模式映射为实际推理尺寸。"""
+    return {
+        "FAST": 512,
+        "STANDARD": IMAGE_SIZE,
+        "ACCURATE": 960,
+    }[mode]
+
+
+def resolve_half_precision(precision: str, device: Union[int, str]) -> bool:
+    """AUTO 在 CUDA 上使用 FP16，在 CPU 上保持 FP32。"""
+    using_cuda = device != "cpu"
+    if precision == "FP16" and not using_cuda:
+        raise HTTPException(status_code=400, detail="FP16 仅可在 CUDA 推理设备上使用")
+    if precision == "FP32":
+        return False
+    return using_cuda
+
+
 # =========================
 # 6. 健康检查接口
 # =========================
@@ -131,13 +153,17 @@ def predict(req: PredictRequest):
 
     # 3. YOLO 推理
     try:
+        device = resolve_device()
         results = model.predict(
             source=str(image_path),
             save=False,
-            conf=CONFIDENCE_THRESHOLD,
-            imgsz=IMAGE_SIZE,
-            device=resolve_device()
+            conf=req.confidenceThreshold,
+            imgsz=resolve_inference_size(req.modelMode),
+            device=device,
+            half=resolve_half_precision(req.precision, device)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"模型推理失败: {str(e)}")
 

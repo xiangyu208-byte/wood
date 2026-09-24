@@ -1,81 +1,30 @@
 <template>
-  <div class="app-container">
-    <!-- 背景遮罩层 -->
-    <div class="bg-mask"></div>
+  <div class="app-shell">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <header class="app-header">
+      <router-link class="brand" to="/detect" aria-label="木材缺陷检测系统首页">
+        <span class="brand-mark" aria-hidden="true">木</span>
+        <span><strong>木材缺陷检测</strong><small>Wood Inspect</small></span>
+      </router-link>
 
-    <el-container class="main-layout">
-      <el-header class="header">
-        <div class="title">木材缺陷检测系统</div>
-        <el-menu
-            mode="horizontal"
-            :default-active="$route.path"
-            router
-            class="menu"
-        >
-          <el-menu-item index="/detect">在线识别</el-menu-item>
-          <el-menu-item index="/camera-detect">摄像头识别</el-menu-item>
-          <el-menu-item index="/history">历史记录</el-menu-item>
-        </el-menu>
-      </el-header>
+      <nav class="primary-nav" aria-label="主要导航">
+        <router-link to="/detect">在线识别</router-link>
+        <router-link to="/camera-detect">摄像头</router-link>
+        <router-link to="/history">历史记录</router-link>
+      </nav>
+    </header>
 
-      <el-main class="main-content">
-        <router-view />
-      </el-main>
-    </el-container>
+    <main id="main-content" class="app-main" tabindex="-1">
+      <router-view v-slot="{ Component }">
+        <Suspense>
+          <component :is="Component" />
+          <template #fallback>
+            <div class="route-loading" role="status">正在加载页面…</div>
+          </template>
+        </Suspense>
+      </router-view>
+    </main>
+
+    <footer class="app-footer">检测结果用于项目辅助评价，请结合人工复核。</footer>
   </div>
 </template>
-
-<style scoped>
-.app-container {
-  position: relative;
-  min-height: 100vh;
-  overflow: hidden;
-  background: url('./assets/school.JPG') no-repeat center center;
-  background-size: cover;
-}
-
-/* 半透明遮罩，避免背景太花影响内容阅读 */
-.bg-mask {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.45);
-  z-index: 0;
-}
-
-/* 主体内容层放在遮罩上面 */
-.main-layout {
-  position: relative;
-  z-index: 1;
-  min-height: 100vh;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(64, 158, 255, 0.88);
-  color: white;
-  padding: 0 24px;
-  backdrop-filter: blur(4px);
-}
-
-.title {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.menu {
-  background: transparent;
-  border-bottom: none;
-}
-
-:deep(.el-card) {
-  background: rgba(255, 255, 255, 0.88);
-  border: none;
-  border-radius: 12px;
-}
-/* 主体区域透明化一点，和背景更融合 */
-.main-content {
-  padding: 20px;
-}
-</style>

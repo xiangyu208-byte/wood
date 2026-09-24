@@ -2,6 +2,7 @@ package com.example.wooddetect.util;
 
 import com.example.wooddetect.common.InferenceServiceException;
 import com.example.wooddetect.config.PythonServiceProperties;
+import com.example.wooddetect.dto.DetectionOptionsDTO;
 import com.example.wooddetect.dto.PythonDetectRequestDTO;
 import com.example.wooddetect.dto.PythonDetectResponseDTO;
 import org.slf4j.Logger;
@@ -33,9 +34,12 @@ public class PythonDetectClient {
         this.restTemplate = new RestTemplate(factory);
     }
 
-    public PythonDetectResponseDTO detect(String imagePath) {
+    public PythonDetectResponseDTO detect(String imagePath, DetectionOptionsDTO options) {
         PythonDetectRequestDTO request = new PythonDetectRequestDTO();
         request.setImagePath(imagePath);
+        request.setModelMode(options.getModelMode());
+        request.setConfidenceThreshold(options.getConfidenceThreshold());
+        request.setPrecision(options.getInferencePrecision());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
