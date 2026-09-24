@@ -1,0 +1,60 @@
+package com.example.wooddetect.vo;
+
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class DetectResponseVO {
+
+    /**
+     * 识别记录ID
+     */
+    private Long recordId;
+
+    /**
+     * 原始文件名
+     */
+    private String imageName;
+
+    /**
+     * 原图访问URL
+     */
+    private String imageUrl;
+
+    /**
+     * 结果图访问URL
+     */
+    private String resultImageUrl;
+
+    /**
+     * 检测总数
+     */
+    private Integer totalCount;
+
+    /**
+     * 状态
+     */
+    private String status;
+
+    /**
+     * 错误信息
+     */
+    private String errorMessage;
+
+    /**
+     * 来源类型：UPLOAD / CAMERA
+     */
+    private String sourceType;
+
+    /**
+     * 识别时间
+     */
+    private LocalDateTime createTime;
+
+    /**
+     * 缺陷明细
+     */
+    private List<DetectDetailVO> details;
+}

@@ -1,0 +1,105 @@
+name: wood-defect-detection
+
+services:
+  database:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-wood_detect}
+      MARIADB_USER: ${DB_USERNAME:-wood}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-wood_change_me}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_change_me}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./deploy/database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u$${MARIADB_USER} -p$${MARIADB_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  inference:
+    build:
+      context: .
+      dockerfile: wood_detect_python/wood_detect/Dockerfile.cpu
+    restart: unless-stopped
+    init: true
+    environment:
+      MODEL_PATH: /models/best.pt
+      UPLOAD_ROOT: /data/uploads
+      ACCESS_URL_PREFIX: /static/
+      MODEL_DEVICE: cpu
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.25}
+      IMAGE_SIZE: ${IMAGE_SIZE:-640}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${PYTHON_PORT:-8001}:8001"
+    volumes:
+      - uploads:/data/uploads
+      - ${MODEL_PATH:-./ultralytics-main/runs/detect/best.pt}:/models/best.pt:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+      start_period: 120s
+
+  backend:
+    build:
+      context: ./wood_detect_backend/wood_backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://database:3306/${DB_NAME:-wood_detect}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: ${DB_USERNAME:-wood}
+      DB_PASSWORD: ${DB_PASSWORD:-wood_change_me}
+      UPLOAD_PATH: /data/uploads
+      ACCESS_URL_PREFIX: /static/
+      PYTHON_PREDICT_URL: http://inference:8001/predict
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-20MB}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-100MB}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      database:
+        condition: service_healthy
+      inference:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./wood_detect_frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8088}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  db_data:
+    name: wood-detect-db-data
+  uploads:
+    name: wood-detect-uploads

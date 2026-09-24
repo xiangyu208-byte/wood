@@ -1,0 +1,10 @@
+* text=auto
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.pt binary
+*.onnx binary
+*.jpg binary
+*.JPG binary
+*.png binary
+*.pptx binary
+*.docx binary

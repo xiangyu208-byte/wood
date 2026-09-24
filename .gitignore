@@ -1,0 +1,24 @@
+.env
+**/.env
+**/.idea/
+**/.vscode/
+**/__pycache__/
+**/*.py[cod]
+**/node_modules/
+**/dist/
+**/target/
+*.iml
+*.log
+~$*.docx
+~$*.pptx
+.DS_Store
+Thumbs.db
+
+# 仅供本地参考，不上传到 GitHub
+/参考ppt.pptx
+
+# 内嵌 Ultralytics 仅保留本项目运行/训练所需源码，避免带入上游工作流和文档站点
+程序源码/ultralytics-main/.github/
+程序源码/ultralytics-main/docs/
+程序源码/ultralytics-main/examples/
+程序源码/ultralytics-main/tests/

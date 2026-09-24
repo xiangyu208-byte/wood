@@ -1,0 +1,8 @@
+services:
+  inference:
+    build:
+      context: .
+      dockerfile: wood_detect_python/wood_detect/Dockerfile.gpu
+    environment:
+      MODEL_DEVICE: ${MODEL_DEVICE:-0}
+    gpus: all

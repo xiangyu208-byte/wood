@@ -1,0 +1,13 @@
+.env
+.idea/
+.vscode/
+*.iml
+*.log
+**/__pycache__/
+**/*.py[cod]
+**/target/
+**/node_modules/
+**/dist/
+data/
+uploads/
+*.onnx

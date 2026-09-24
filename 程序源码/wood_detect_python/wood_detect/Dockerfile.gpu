@@ -1,0 +1,24 @@
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY ultralytics-main /opt/ultralytics
+COPY wood_detect_python/wood_detect/requirements.txt ./requirements.txt
+RUN pip install /opt/ultralytics -r requirements.txt
+
+COPY wood_detect_python/wood_detect/detect.py ./detect.py
+
+RUN useradd --create-home --uid 10001 app \
+    && mkdir -p /data/uploads/result \
+    && chown -R app:app /app /data/uploads
+
+USER app
+EXPOSE 8001
+CMD ["uvicorn", "detect:app", "--host", "0.0.0.0", "--port", "8001"]

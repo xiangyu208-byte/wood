@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: wood-detect
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:20MB}
+      max-request-size: ${MAX_REQUEST_SIZE:100MB}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+file:
+  upload-path: ${UPLOAD_PATH:./data/uploads}
+  access-url-prefix: ${ACCESS_URL_PREFIX:/static/}
+
+python:
+  predict-url: ${PYTHON_PREDICT_URL:http://127.0.0.1:8001/predict}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>上传测试</title>
+</head>
+<body>
+<h2>木材图片上传测试</h2>
+
+<input type="file" id="fileInput" accept="image/*">
+<button onclick="uploadFile()">上传图片</button>
+
+<pre id="result"></pre>
+
+<script>
+    async function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const result = document.getElementById('result');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            result.textContent = '请先选择一张图片';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const response = await fetch('/api/detect/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            result.textContent = JSON.stringify(data, null, 2);
+        } catch (error) {
+            result.textContent = '请求失败：' + error;
+        }
+    }
+</script>
+</body>
+</html>
