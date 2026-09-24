@@ -349,28 +349,7 @@ function handleExportExcel() {
 }
 
 function handleDownloadImagesZip() {
-  const params = new URLSearchParams()
-
-  if (queryForm.value.imageName) {
-    params.append('imageName', queryForm.value.imageName)
-  }
-  if (queryForm.value.status) {
-    params.append('status', queryForm.value.status)
-  }
-  if (queryForm.value.batchNo) {
-    params.append('batchNo', queryForm.value.batchNo)
-  }
-  if (queryForm.value.sourceType) {
-    params.append('sourceType', queryForm.value.sourceType)
-  }
-  if (queryForm.value.startTime) {
-    params.append('startTime', queryForm.value.startTime)
-  }
-  if (queryForm.value.endTime) {
-    params.append('endTime', queryForm.value.endTime)
-  }
-
-  const query = params.toString()
+  const query = buildExportParams()
   const url = `/api/detect/export/images${query ? '?' + query : ''}`
 
   window.open(url, '_blank')

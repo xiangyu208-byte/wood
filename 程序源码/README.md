@@ -10,7 +10,6 @@
 ├─ wood_detect_backend/wood_backend/ Spring Boot 后端
 ├─ wood_detect_python/wood_detect/   FastAPI 推理服务
 ├─ ultralytics-main/                 项目使用的 Ultralytics 源码与模型
-├─ deploy/database/                  首次启动的数据库初始化 SQL
 ├─ scripts/                          Windows、Linux、macOS 启停脚本
 ├─ docker-compose.yml                默认 CPU 编排
 └─ docker-compose.gpu.yml            NVIDIA GPU 覆盖配置
@@ -94,6 +93,13 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `MODEL_DEVICE` | `0` | GPU 编号，仅 GPU 覆盖配置使用 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 推理置信度阈值 |
 | `IMAGE_SIZE` | `640` | 推理输入尺寸 |
+| `MAX_FILE_SIZE` / `MAX_REQUEST_SIZE` | `20MB` / `100MB` | 上传大小限制 |
+| `ALLOWED_IMAGE_EXTENSIONS` | `jpg,jpeg,png,bmp` | 允许的图片扩展名 |
+| `MAX_IMAGE_WIDTH` / `MAX_IMAGE_HEIGHT` | `10000` | 最大图片宽高 |
+| `MAX_IMAGE_PIXELS` | `40000000` | 最大像素数 |
+| `MAX_BATCH_SIZE` | `50` | 批量上传上限 |
+| `PYTHON_CONNECT_TIMEOUT` / `PYTHON_READ_TIMEOUT` | `3s` / `120s` | 推理调用超时 |
+| `PYTHON_MAX_ATTEMPTS` | `2` | 推理最大尝试次数 |
 
 正式部署前必须修改数据库密码。若端口被占用，只需修改 `.env` 中相应端口。
 
@@ -107,6 +113,13 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | MariaDB | `localhost:3306` | Compose 内置 `mariadb-admin ping` |
 
 前端通过同源 `/api` 访问后端，通过 `/static` 访问原图和结果图。Nginx 统一代理这两个路径，因此浏览器端不再依赖写死的 `localhost:8080`。
+
+Swagger 文档位于 <http://localhost:8080/swagger-ui.html>，OpenAPI JSON 位于 <http://localhost:8080/v3/api-docs>。
+
+异步批量任务接口：
+
+- `POST /api/detect/batch-upload-async`：创建任务并返回 HTTP 202。
+- `GET /api/detect/batch-status/{batchNo}`：读取总体进度、成功/失败数量及逐项状态。
 
 查看状态和日志：
 
@@ -131,14 +144,24 @@ Compose 使用两个命名卷：
 docker compose down
 ```
 
-`docker compose down -v` 会永久删除数据库和上传卷，请仅在确定需要清空全部业务数据时使用。`deploy/database/init.sql` 只会在数据库卷首次创建时执行；后续结构升级计划使用 Flyway 管理。
+`docker compose down -v` 会永久删除数据库和上传卷，请仅在确定需要清空全部业务数据时使用。数据库表由后端启动时通过 Flyway 自动创建和升级，迁移脚本位于 `wood_detect_backend/wood_backend/src/main/resources/db/migration`。
 
 ## 本地开发
 
-后端默认启用 `dev` 配置，配置文件位于：
+后端默认启用 `dev` 配置，数据库用户名和密码必须通过环境变量提供。项目自带 Maven Wrapper：
+
+```powershell
+cd wood_detect_backend\wood_backend
+$env:DB_USERNAME='wood'
+$env:DB_PASSWORD='your_password'
+.\mvnw.cmd test
+.\mvnw.cmd spring-boot:run
+```
+
+配置文件位于：
 
 - `application.yml`：公共配置与环境变量入口。
-- `application-dev.yml`：本机开发默认值。
+- `application-dev.yml`：本机开发连接地址。
 - `application-docker.yml`：Compose 服务名与容器路径。
 - `application-prod.yml`：生产环境强制从环境变量读取敏感配置。
 
@@ -166,6 +189,8 @@ python detect.py
 - Apple Silicon 构建较慢：首次安装 ARM64 PyTorch/Ultralytics 依赖需要较长时间，后续会使用 Docker 缓存。
 - GPU 容器无法启动：先通过 `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` 验证宿主机 GPU 容器环境。
 
-## 当前边界
+## 当前完成范围与边界
 
-第一阶段完成工程标准化和跨平台容器运行。推理异常状态一致性、UUID 文件名、严格 MIME 校验、数据库分页、Flyway 迁移、自动化测试和 ONNX 推理属于后续阶段。
+第一、二阶段已完成工程标准化、跨平台容器配置和后端可靠性改造，包括 Flyway、UUID 文件名、严格图片校验、数据库分页、状态闭环、超时重试、异步批次进度、统一错误响应、Swagger 和文件存储单元测试。
+
+后续仍需完成前端异步进度展示、前端资源优化、统一模型训练/验证流程、ONNX 推理、更完整的集成与端到端测试，以及 Linux/macOS/移动浏览器的正式验收矩阵。

@@ -48,6 +48,11 @@ public class DetectHistoryVO {
     private String status;
 
     /**
+     * 失败原因
+     */
+    private String errorMessage;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

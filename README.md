@@ -4,18 +4,22 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 
 项目采用前后端分离架构，默认提供无需 CUDA 的 CPU 容器方案，同时保留 NVIDIA GPU 推理方案。Windows、Linux 和 macOS 可使用 Docker Compose 部署，手机和平板可作为浏览器客户端访问。
 
-> 当前仓库仍处于持续开发阶段。第一阶段“工程标准化与跨平台运行”的工程内容已经完成，完整进度和后续安排见[项目实现计划与进度](项目实现计划与进度.md)。
+> 当前仓库仍处于持续开发阶段。第一、二阶段已经完成：工程可容器化运行，数据库迁移、文件安全、任务状态、异常处理和数据库分页等后端可靠性能力已落地。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
 
 ## 主要功能
 
 - 单张图片上传识别，并展示带检测框的结果图。
-- 多张图片批量上传与识别。
+- 多张图片同步识别，以及带总进度和逐项状态的异步批量任务。
 - 浏览器摄像头拍照识别。
 - 展示缺陷类别、置信度和边界框坐标。
 - 保存检测记录、原图、结果图和缺陷明细。
 - 按图片名称、任务状态、批次、来源、缺陷情况和时间范围筛选历史记录。
 - 支持单条删除、勾选批量删除和按条件删除。
 - 支持 CSV、Excel、原图及结果图 ZIP 导出。
+- 上传图片使用 UUID 保存；校验扩展名、真实格式、MIME、宽高和像素数，避免同名覆盖及伪装文件。
+- 推理调用支持连接/读取超时和有限重试，服务异常时记录会落为 `FAIL` 并保留失败原因。
+- 使用 Flyway 自动创建及升级数据库，历史列表由数据库原生分页。
+- 提供统一错误响应、正确 HTTP 状态码和 OpenAPI/Swagger 文档。
 - 提供 CPU 和 NVIDIA GPU 两种推理容器。
 - 提供服务健康检查、数据库自动建表和持久化数据卷。
 
@@ -42,10 +46,11 @@ Nginx + Vue 3
         │
         ▼
 Spring Boot + MyBatis-Plus
-  ├─ 文件上传与静态资源访问
-  ├─ 检测任务和历史记录管理
+  ├─ 安全文件存储与静态资源访问
+  ├─ 同步/异步检测任务和历史记录管理
   ├─ CSV / Excel / ZIP 导出
-  └─ 调用 Python 推理服务
+  ├─ 超时、重试、失败状态与事务补偿
+  └─ Flyway 数据库迁移与 OpenAPI 文档
         │
         ▼
 FastAPI + Ultralytics + PyTorch
@@ -62,7 +67,7 @@ MariaDB + Docker 持久化卷
 |---|---|
 | 前端 | Vue 3、Vue Router、Element Plus、Axios、Vite |
 | 网关与静态站点 | Nginx |
-| 后端 | Java 17、Spring Boot 3.3、MyBatis-Plus、Apache POI |
+| 后端 | Java 17、Spring Boot 3.3、MyBatis-Plus、Flyway、Springdoc OpenAPI、Apache POI |
 | 推理服务 | Python 3.11、FastAPI、Ultralytics、PyTorch、OpenCV |
 | 数据库 | MariaDB 11.4 |
 | 部署 | Docker、Docker Compose |
@@ -78,7 +83,6 @@ wood/
    ├─ docker-compose.yml
    ├─ docker-compose.gpu.yml
    ├─ .env.example
-   ├─ deploy/database/init.sql
    ├─ scripts/
    │  ├─ start.ps1
    │  ├─ stop.ps1
@@ -193,6 +197,14 @@ cp .env.example .env
 | `IMAGE_SIZE` | `640` | 模型输入尺寸 |
 | `MAX_FILE_SIZE` | `20MB` | 单文件上传限制 |
 | `MAX_REQUEST_SIZE` | `100MB` | 单次请求总大小限制 |
+| `ALLOWED_IMAGE_EXTENSIONS` | `jpg,jpeg,png,bmp` | 允许的图片扩展名 |
+| `MAX_IMAGE_WIDTH` / `MAX_IMAGE_HEIGHT` | `10000` | 最大图片宽高 |
+| `MAX_IMAGE_PIXELS` | `40000000` | 最大图片像素数 |
+| `MAX_BATCH_SIZE` | `50` | 单次批量图片上限 |
+| `PYTHON_CONNECT_TIMEOUT` | `3s` | 推理服务连接超时 |
+| `PYTHON_READ_TIMEOUT` | `120s` | 推理服务读取超时 |
+| `PYTHON_MAX_ATTEMPTS` | `2` | 推理最大尝试次数 |
+| `PYTHON_RETRY_DELAY` | `500ms` | 推理重试间隔 |
 
 正式部署前请务必修改数据库密码，不要将实际 `.env` 文件提交到仓库。
 
@@ -207,12 +219,16 @@ cp .env.example .env
 
 实际使用时建议通过 `8088` 的 Nginx 统一入口访问系统。前端 API 使用同源 `/api`，图片资源使用同源 `/static`，不依赖写死的本机地址。
 
+后端 API 文档可在 <http://localhost:8080/swagger-ui.html> 查看，OpenAPI JSON 位于 <http://localhost:8080/v3/api-docs>。
+
 ## 后端 API 概览
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `POST` | `/api/detect/upload` | 上传并识别单张图片 |
 | `POST` | `/api/detect/batch-upload` | 批量上传并识别 |
+| `POST` | `/api/detect/batch-upload-async` | 创建异步批量识别任务，HTTP 202 |
+| `GET` | `/api/detect/batch-status/{batchNo}` | 查询批次总进度和逐项状态 |
 | `POST` | `/api/detect/camera-upload` | 上传摄像头截图并识别 |
 | `GET` | `/api/detect/history` | 分页查询历史记录 |
 | `GET` | `/api/detect/{id}` | 查询检测详情 |
@@ -223,6 +239,7 @@ cp .env.example .env
 | `GET` | `/api/detect/export/excel` | 导出 Excel |
 | `GET` | `/api/detect/export/images` | 下载原图和结果图 ZIP |
 | `GET` | `/actuator/health` | 后端健康检查 |
+| `GET` | `/swagger-ui.html` | Swagger API 文档 |
 
 FastAPI 推理服务提供：
 
@@ -239,6 +256,8 @@ Compose 创建两个命名卷：
 - `wood-detect-uploads`：保存上传原图与推理结果图，并由后端和推理服务共享。
 
 模型文件通过只读方式挂载至推理容器内的 `/models/best.pt`。修改 `.env` 中的 `MODEL_PATH` 可以切换模型，而不需要重新制作镜像。
+
+数据库结构不再依赖仅首次启动执行的初始化 SQL。后端启动时会通过 `src/main/resources/db/migration` 中的 Flyway 脚本检查并升级结构；迁移记录保存在 `flyway_schema_history` 表中。
 
 普通执行 `docker compose down` 不会删除数据。以下命令会永久删除数据库和上传文件卷，请谨慎使用：
 
@@ -260,10 +279,20 @@ Vite 开发服务器会把 `/api` 和 `/static` 代理到 `VITE_DEV_BACKEND_URL`
 
 ### Spring Boot 后端
 
-后端使用 Java 17，配置分为：
+后端使用 Java 17，并提供固定 Maven 版本的 Wrapper。先设置数据库环境变量，再构建或运行：
+
+```powershell
+cd 程序源码\wood_detect_backend\wood_backend
+$env:DB_USERNAME='wood'
+$env:DB_PASSWORD='your_password'
+.\mvnw.cmd test
+.\mvnw.cmd spring-boot:run
+```
+
+Linux/macOS 对应使用 `./mvnw`。配置分为：
 
 - `application.yml`：公共配置和环境变量入口。
-- `application-dev.yml`：本地开发默认值。
+- `application-dev.yml`：本地开发连接地址；数据库凭据必须从环境变量传入。
 - `application-docker.yml`：Compose 服务名和容器路径。
 - `application-prod.yml`：生产环境配置，敏感值必须通过环境变量提供。
 
@@ -288,11 +317,15 @@ python detect.py
 - Windows、Linux、macOS 启停脚本。
 - 前端生产构建和依赖漏洞处理。
 - Git 与 GitHub 版本管理。
+- Flyway V1/V2 数据库自动迁移和批次表。
+- UUID 文件存储、图片真实性/尺寸校验和删除补偿。
+- `PENDING / PROCESSING / SUCCESS / FAIL` 状态闭环、推理超时与重试。
+- HTTP 错误语义、统一错误结构、数据库原生分页和一致筛选条件。
+- 异步批量任务、逐项进度、Swagger 文档、Maven Wrapper 和可执行 JAR。
+- 后端文件存储单元测试，以及 Docker 下 Flyway、API、万条分页的阶段验收。
 
 后续重点：
 
-- 使用 Flyway 管理数据库迁移。
-- 完善文件校验、异常状态和数据库分页。
 - 统一 6 类模型训练、验证、导出与基准测试流程。
 - 增加 ONNX CPU 推理方案。
 - 实现高分辨率切片检测、质量评分和人工复核闭环。
@@ -303,10 +336,10 @@ python detect.py
 ## 已知限制
 
 - 当前仓库未包含训练数据集，因此不能直接完整复现模型训练。
-- 数据库目前使用首次启动 SQL 初始化，尚未接入 Flyway 版本迁移。
 - 前端背景图片和生产 JavaScript 包仍需要在后续阶段压缩、拆分。
 - 跨平台配置已经建立，但 Windows、Linux、macOS 和移动浏览器仍需完成正式验收矩阵。
 - 当前 PyTorch 模型推理依赖 Ultralytics；ONNX 跨平台模型尚未提供。
+- 前端尚未接入新的异步批次进度接口；目前仍以同步批量操作为主。
 
 ## 许可证说明
 

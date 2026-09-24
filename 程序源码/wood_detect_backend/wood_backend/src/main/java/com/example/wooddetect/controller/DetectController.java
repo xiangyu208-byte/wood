@@ -2,11 +2,14 @@ package com.example.wooddetect.controller;
 
 import com.example.wooddetect.common.Result;
 import com.example.wooddetect.service.DetectService;
+import com.example.wooddetect.vo.BatchTaskVO;
 import com.example.wooddetect.vo.DetectHistoryVO;
 import com.example.wooddetect.vo.DetectResponseVO;
 import com.example.wooddetect.vo.PageResultVO;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,6 +39,25 @@ public class DetectController {
     public Result<List<DetectResponseVO>> batchUpload(@RequestParam("files") MultipartFile[] files) {
         List<DetectResponseVO> result = detectService.batchUploadAndDetect(files);
         return Result.success("批量图片上传并识别成功", result);
+    }
+
+    /**
+     * 创建可轮询进度的异步批量识别任务
+     */
+    @PostMapping("/batch-upload-async")
+    public ResponseEntity<Result<BatchTaskVO>> batchUploadAsync(
+            @RequestParam("files") MultipartFile[] files) {
+        BatchTaskVO task = detectService.createAsyncBatch(files);
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(Result.success("批量任务已创建", task));
+    }
+
+    /**
+     * 查询批量任务总进度和逐项状态
+     */
+    @GetMapping("/batch-status/{batchNo}")
+    public Result<BatchTaskVO> batchStatus(@PathVariable String batchNo) {
+        return Result.success(detectService.getBatchStatus(batchNo));
     }
 
     /**

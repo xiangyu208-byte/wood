@@ -1,61 +1,84 @@
 package com.example.wooddetect.util;
 
+import com.example.wooddetect.common.InferenceServiceException;
+import com.example.wooddetect.config.PythonServiceProperties;
 import com.example.wooddetect.dto.PythonDetectRequestDTO;
 import com.example.wooddetect.dto.PythonDetectResponseDTO;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
-/**
- * 调用 Python 推理服
- * 把图片路径发给 Python
- * 接收 Python 返回结果
- * 转成 PythonDetectResponseDTO
- */
 @Component
 public class PythonDetectClient {
 
-    /**
-     * 从 application.yml 读取 Python 推理服务地址
-     * 例如：http://127.0.0.1:8001/predict
-     */
-    @Value("${python.predict-url}")
-    private String pythonPredictUrl;
+    private static final Logger log = LoggerFactory.getLogger(PythonDetectClient.class);
 
-    /**
-     * 调用 Python 推理服务
-     */
+    private final PythonServiceProperties properties;
+    private final RestTemplate restTemplate;
+
+    public PythonDetectClient(PythonServiceProperties properties) {
+        this.properties = properties;
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(properties.getConnectTimeout());
+        factory.setReadTimeout(properties.getReadTimeout());
+        this.restTemplate = new RestTemplate(factory);
+    }
+
     public PythonDetectResponseDTO detect(String imagePath) {
-        //Spring 提供的 HTTP 客户端工具，专门用来发送 HTTP 请求
-        RestTemplate restTemplate = new RestTemplate();
+        PythonDetectRequestDTO request = new PythonDetectRequestDTO();
+        request.setImagePath(imagePath);
 
-        // 1. 组装请求体
-        PythonDetectRequestDTO requestDTO = new PythonDetectRequestDTO();
-        requestDTO.setImagePath(imagePath);
-
-        // 2. 设置请求头
         HttpHeaders headers = new HttpHeaders();
-        //设置请求头的 Content-Type 为 application/json
         headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<PythonDetectRequestDTO> entity = new HttpEntity<>(request, headers);
 
-        // 3. 把请求体和请求头封装为 HttpEntity
-        HttpEntity<PythonDetectRequestDTO> httpEntity = new HttpEntity<>(requestDTO, headers);
+        int attempts = Math.max(1, properties.getMaxAttempts());
+        Exception lastError = null;
 
-        // 4. 发送 POST 请求到 Python 推理服务
-        ResponseEntity<PythonDetectResponseDTO> response = restTemplate.exchange(
-                pythonPredictUrl,
-                HttpMethod.POST,//指定发送 POST 请求
-                httpEntity,
-                PythonDetectResponseDTO.class//指定响应体的类型，RestTemplate 会自动把 Python 服务返回的 JSON 转换成这个 DTO 对象。
-        );
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                ResponseEntity<PythonDetectResponseDTO> response = restTemplate.exchange(
+                        properties.getPredictUrl(), HttpMethod.POST, entity, PythonDetectResponseDTO.class);
+                PythonDetectResponseDTO body = response.getBody();
+                if (body == null) {
+                    throw new InferenceServiceException("推理服务返回空响应");
+                }
+                return body;
+            } catch (RestClientResponseException e) {
+                lastError = e;
+                if (e.getStatusCode().is4xxClientError()) {
+                    throw new InferenceServiceException("推理服务拒绝请求，HTTP " + e.getStatusCode().value(), e);
+                }
+                log.warn("推理服务第 {}/{} 次调用失败，HTTP {}", attempt, attempts, e.getStatusCode().value());
+            } catch (ResourceAccessException e) {
+                lastError = e;
+                log.warn("推理服务第 {}/{} 次连接失败: {}", attempt, attempts, e.getMessage());
+            } catch (InferenceServiceException e) {
+                throw e;
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("推理服务第 {}/{} 次调用异常: {}", attempt, attempts, e.getMessage());
+            }
 
-        // 5. 获取响应体
-        PythonDetectResponseDTO body = response.getBody();
-        if (body == null) {
-            throw new RuntimeException("Python 推理服务返回为空");
+            if (attempt < attempts) {
+                try {
+                    Thread.sleep(Math.max(0, properties.getRetryDelay().toMillis()));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new InferenceServiceException("推理调用被中断", e);
+                }
+            }
         }
 
-        return body;
+        throw new InferenceServiceException("推理服务暂时不可用，已重试 " + attempts + " 次", lastError);
     }
 }

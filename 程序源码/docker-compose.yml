@@ -14,7 +14,6 @@ services:
       - "${DB_PORT:-3306}:3306"
     volumes:
       - db_data:/var/lib/mysql
-      - ./deploy/database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -u$${MARIADB_USER} -p$${MARIADB_PASSWORD} --silent"]
       interval: 10s
@@ -64,6 +63,15 @@ services:
       PYTHON_PREDICT_URL: http://inference:8001/predict
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-20MB}
       MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-100MB}
+      ALLOWED_IMAGE_EXTENSIONS: ${ALLOWED_IMAGE_EXTENSIONS:-jpg,jpeg,png,bmp}
+      MAX_IMAGE_WIDTH: ${MAX_IMAGE_WIDTH:-10000}
+      MAX_IMAGE_HEIGHT: ${MAX_IMAGE_HEIGHT:-10000}
+      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-40000000}
+      MAX_BATCH_SIZE: ${MAX_BATCH_SIZE:-50}
+      PYTHON_CONNECT_TIMEOUT: ${PYTHON_CONNECT_TIMEOUT:-3s}
+      PYTHON_READ_TIMEOUT: ${PYTHON_READ_TIMEOUT:-120s}
+      PYTHON_MAX_ATTEMPTS: ${PYTHON_MAX_ATTEMPTS:-2}
+      PYTHON_RETRY_DELAY: ${PYTHON_RETRY_DELAY:-500ms}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "${BACKEND_PORT:-8080}:8080"

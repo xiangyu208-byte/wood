@@ -2,6 +2,8 @@ package com.example.wooddetect.common;
 
 import lombok.Data;
 
+import java.time.OffsetDateTime;
+
 /**
  *这是统一返回结果类。
  *后端接口不会直接裸返回数据，而是统一包装成这种格式
@@ -22,11 +24,14 @@ public class Result<T> {
     private String message;//返回提示信息
     private T data;//接口真正返回的数据
 
+    private OffsetDateTime timestamp;
+
     public static <T> Result<T> success(T data) {
         Result<T> result = new Result<>();
         result.setCode(200);
         result.setMessage("success");
         result.setData(data);
+        result.setTimestamp(OffsetDateTime.now());
         return result;
     }
 
@@ -35,14 +40,20 @@ public class Result<T> {
         result.setCode(200);
         result.setMessage(message);
         result.setData(data);
+        result.setTimestamp(OffsetDateTime.now());
         return result;
     }
 
     public static <T> Result<T> fail(String message) {
+        return fail(500, message);
+    }
+
+    public static <T> Result<T> fail(int code, String message) {
         Result<T> result = new Result<>();
-        result.setCode(500);
+        result.setCode(code);
         result.setMessage(message);
         result.setData(null);
+        result.setTimestamp(OffsetDateTime.now());
         return result;
     }
 }

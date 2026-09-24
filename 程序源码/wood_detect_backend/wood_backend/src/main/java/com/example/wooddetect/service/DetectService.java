@@ -3,6 +3,7 @@ package com.example.wooddetect.service;
 import com.example.wooddetect.vo.DetectHistoryVO;
 import com.example.wooddetect.vo.DetectResponseVO;
 import com.example.wooddetect.vo.PageResultVO;
+import com.example.wooddetect.vo.BatchTaskVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,6 +25,16 @@ public interface DetectService {
      * 批量图片上传并识别
      */
     List<DetectResponseVO> batchUploadAndDetect(MultipartFile[] files);
+
+    /**
+     * 创建异步批量任务，调用方可通过批次号轮询进度
+     */
+    BatchTaskVO createAsyncBatch(MultipartFile[] files);
+
+    /**
+     * 查询批量任务及逐项状态
+     */
+    BatchTaskVO getBatchStatus(String batchNo);
 
     /**
      * 分页查询历史记录（支持筛选）

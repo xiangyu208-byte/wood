@@ -11,6 +11,11 @@ spring:
     multipart:
       max-file-size: ${MAX_FILE_SIZE:20MB}
       max-request-size: ${MAX_REQUEST_SIZE:100MB}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
 
 mybatis-plus:
   configuration:
@@ -22,9 +27,24 @@ mybatis-plus:
 file:
   upload-path: ${UPLOAD_PATH:./data/uploads}
   access-url-prefix: ${ACCESS_URL_PREFIX:/static/}
+  allowed-extensions: ${ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,bmp}
+  max-width: ${MAX_IMAGE_WIDTH:10000}
+  max-height: ${MAX_IMAGE_HEIGHT:10000}
+  max-pixels: ${MAX_IMAGE_PIXELS:40000000}
+  max-batch-size: ${MAX_BATCH_SIZE:50}
 
 python:
   predict-url: ${PYTHON_PREDICT_URL:http://127.0.0.1:8001/predict}
+  connect-timeout: ${PYTHON_CONNECT_TIMEOUT:3s}
+  read-timeout: ${PYTHON_READ_TIMEOUT:120s}
+  max-attempts: ${PYTHON_MAX_ATTEMPTS:2}
+  retry-delay: ${PYTHON_RETRY_DELAY:500ms}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
 
 management:
   endpoints:

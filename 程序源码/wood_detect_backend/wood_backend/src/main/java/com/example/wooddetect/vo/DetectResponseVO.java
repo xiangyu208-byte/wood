@@ -14,6 +14,11 @@ public class DetectResponseVO {
     private Long recordId;
 
     /**
+     * 批量任务编号；单张上传时为空
+     */
+    private String batchNo;
+
+    /**
      * 原始文件名
      */
     private String imageName;
