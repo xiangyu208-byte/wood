@@ -14,5 +14,5 @@ $composeArgs += 'down'
 
 & docker @composeArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose 停止失败，退出码：$LASTEXITCODE"
+    throw "Docker Compose failed with exit code $LASTEXITCODE"
 }
