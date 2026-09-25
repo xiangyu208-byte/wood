@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from pathlib import Path
-from typing import List, Literal, Union
+from typing import List, Literal, Mapping, Union
 import cv2
 import torch
 import os
@@ -24,16 +24,6 @@ IMAGE_SIZE = int(os.getenv("IMAGE_SIZE", "640"))
 RESULT_DIR = UPLOAD_ROOT / "result"
 RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
-# 类别名称
-CLASS_NAMES = {
-    0: "dry_knot",
-    1: "sound_knot",
-    2: "edge_knot",
-    3: "small_knot",
-    4: "split",
-    5: "wave",
-}
-
 # =========================
 # 3. 启动时加载模型
 # =========================
@@ -41,6 +31,13 @@ if not MODEL_PATH.is_file():
     raise RuntimeError(f"模型文件不存在: {MODEL_PATH}")
 
 model = YOLO(str(MODEL_PATH))
+
+
+def normalize_model_names(names: Mapping[int | str, str] | List[str]) -> dict[int, str]:
+    """将 PyTorch/ONNX 模型元数据中的类别统一为整数键字典。"""
+    if isinstance(names, Mapping):
+        return {int(class_id): str(name) for class_id, name in names.items()}
+    return {class_id: str(name) for class_id, name in enumerate(names)}
 
 
 # =========================
@@ -127,11 +124,17 @@ def resolve_half_precision(precision: str, device: Union[int, str]) -> bool:
 # =========================
 @app.get("/health")
 def health():
+    try:
+        class_names = normalize_model_names(model.names)
+    except (AttributeError, TypeError, ValueError):
+        class_names = {}
     return {
         "success": True,
         "message": "Python detection service is running",
         "model": MODEL_PATH.name,
-        "device": str(resolve_device())
+        "device": str(resolve_device()),
+        "backend": MODEL_PATH.suffix.lower().lstrip("."),
+        "classNames": class_names,
     }
 
 
@@ -171,6 +174,7 @@ def predict(req: PredictRequest):
         raise HTTPException(status_code=500, detail="模型未返回结果")
 
     result = results[0]
+    class_names = normalize_model_names(result.names)
 
     # 4. 提取检测框明细
     details = []
@@ -185,7 +189,7 @@ def predict(req: PredictRequest):
             x1, y1, x2, y2 = map(int, xyxy.tolist())
             cls_id = int(cls_id)
 
-            class_name = CLASS_NAMES.get(cls_id, str(cls_id))
+            class_name = class_names.get(cls_id, str(cls_id))
 
             details.append(
                 DetectItem(

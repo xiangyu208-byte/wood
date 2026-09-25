@@ -203,3 +203,15 @@ calibration_*.npy
 # Training logs
 args.yaml
 results.csv
+
+# Wood 项目交付的最终模型与可复现烟雾测试记录
+!runs/
+runs/*
+!runs/detect/
+runs/detect/*
+!runs/detect/best.pt
+!runs/detect/best.onnx
+!runs/detect/best.manifest.json
+!runs/benchmark/
+runs/benchmark/*
+!runs/benchmark/cpu-smoke.json

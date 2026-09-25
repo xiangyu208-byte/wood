@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-09-24T15:44:00.181550+00:00",
+  "torch_cuda_available": false,
+  "imgsz": 896,
+  "source": "/workspace/wood_detect_frontend/src/assets/straw.webp",
+  "results": [
+    {
+      "model": "/workspace/ultralytics-main/runs/detect/best.pt",
+      "format": "pt",
+      "class_names": [
+        "dry_knot",
+        "sound_knot",
+        "edge_knot",
+        "small_knot",
+        "split",
+        "wave"
+      ],
+      "device": "cpu",
+      "images": 1,
+      "repeat": 3,
+      "detections_last_run": 0,
+      "latency_ms_per_image": {
+        "mean": 135.4012623332892,
+        "median": 135.05740999994487,
+        "min": 131.07380699989335,
+        "max": 140.07257000002937
+      },
+      "throughput_images_per_second": 7.385455517678317
+    },
+    {
+      "model": "/workspace/ultralytics-main/runs/detect/best.onnx",
+      "format": "onnx",
+      "class_names": [
+        "dry_knot",
+        "sound_knot",
+        "edge_knot",
+        "small_knot",
+        "split",
+        "wave"
+      ],
+      "device": "cpu",
+      "images": 1,
+      "repeat": 3,
+      "detections_last_run": 0,
+      "latency_ms_per_image": {
+        "mean": 126.70080533333324,
+        "median": 126.03021299992179,
+        "min": 124.37522699997317,
+        "max": 129.69697600010477
+      },
+      "throughput_images_per_second": 7.892609659181967
+    }
+  ]
+}

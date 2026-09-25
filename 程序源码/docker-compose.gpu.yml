@@ -4,5 +4,8 @@ services:
       context: .
       dockerfile: wood_detect_python/wood_detect/Dockerfile.gpu
     environment:
+      MODEL_PATH: /models/best.pt
       MODEL_DEVICE: ${MODEL_DEVICE:-0}
+    volumes:
+      - ${PYTORCH_MODEL_PATH:-./ultralytics-main/runs/detect/best.pt}:/models/best.pt:ro
     gpus: all

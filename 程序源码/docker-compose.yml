@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      MODEL_PATH: /models/best.pt
+      MODEL_PATH: /models/best.onnx
       UPLOAD_ROOT: /data/uploads
       ACCESS_URL_PREFIX: /static/
       MODEL_DEVICE: cpu
@@ -39,7 +39,7 @@ services:
       - "${PYTHON_PORT:-8001}:8001"
     volumes:
       - uploads:/data/uploads
-      - ${MODEL_PATH:-./ultralytics-main/runs/detect/best.pt}:/models/best.pt:ro
+      - ${ONNX_MODEL_PATH:-./ultralytics-main/runs/detect/best.onnx}:/models/best.onnx:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5)"]
       interval: 15s

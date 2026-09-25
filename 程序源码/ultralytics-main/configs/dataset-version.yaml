@@ -1,0 +1,16 @@
+dataset:
+  name: wood-defect-6class
+  version: unavailable
+  status: missing-from-repository
+  expected_images: 3836
+  expected_train_images: 3105
+  expected_validation_images: 731
+  source: Roboflow export described by the thesis; exact export ID and archive are unavailable
+  class_names:
+    - dry_knot
+    - sound_knot
+    - edge_knot
+    - small_knot
+    - split
+    - wave
+  note: Replace version and source with an immutable dataset release before publishing metrics.

@@ -1,0 +1,3 @@
+# Install the vendored package first: pip install -e .
+onnx>=1.17,<2
+onnxruntime>=1.20,<2

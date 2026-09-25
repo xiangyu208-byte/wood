@@ -20,7 +20,8 @@
 - Docker Desktop 4.x 或 Docker Engine + Docker Compose v2
 - CPU 模式建议至少 8 GB 内存，首次构建需要联网下载基础镜像和依赖
 - GPU 模式需要 NVIDIA GPU、合适的宿主机驱动和 NVIDIA Container Toolkit
-- 默认模型文件：`ultralytics-main/runs/detect/best.pt`
+- CPU 默认模型：`ultralytics-main/runs/detect/best.onnx`
+- GPU 默认模型：`ultralytics-main/runs/detect/best.pt`
 
 不需要在宿主机安装 Java、Node.js、Python、MariaDB 或 CUDA SDK。
 
@@ -89,7 +90,8 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `DB_USERNAME` | `wood` | 业务数据库用户 |
 | `DB_PASSWORD` | `wood_change_me` | 业务数据库密码 |
 | `DB_ROOT_PASSWORD` | `root_change_me` | 数据库 root 密码 |
-| `MODEL_PATH` | `./ultralytics-main/runs/detect/best.pt` | 宿主机模型文件路径 |
+| `ONNX_MODEL_PATH` | `./ultralytics-main/runs/detect/best.onnx` | CPU 模型文件路径 |
+| `PYTORCH_MODEL_PATH` | `./ultralytics-main/runs/detect/best.pt` | GPU 模型文件路径 |
 | `MODEL_DEVICE` | `0` | GPU 编号，仅 GPU 覆盖配置使用 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 推理置信度阈值 |
 | `IMAGE_SIZE` | `640` | 推理输入尺寸 |
@@ -140,7 +142,21 @@ Compose 使用两个命名卷：
 - `wood-detect-db-data`：MariaDB 数据文件。
 - `wood-detect-uploads`：上传原图与推理结果图，由后端和推理服务共享。
 
-模型通过只读绑定挂载到容器内 `/models/best.pt`，不复制到持久化卷。修改 `.env` 的 `MODEL_PATH` 即可切换宿主机模型。
+CPU 模式把 ONNX 模型只读挂载到 `/models/best.onnx`；GPU 覆盖配置把 PyTorch 权重挂载到 `/models/best.pt`。模型不复制到持久化卷。
+
+## 模型训练、评估与导出
+
+```bash
+cd ultralytics-main
+pip install -e .
+pip install -r requirements-model.txt
+python train.py --config configs/train.yaml
+python evaluate.py --model runs/detect/best.pt --data yolo-bvn.yaml
+python export_onnx.py --model runs/detect/best.pt --imgsz 896 --opset 17
+python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source path/to/images --device cpu
+```
+
+详细模型身份、历史指标和复现边界见 `ultralytics-main/MODEL_REPORT.md`。数据集不在仓库中，训练和评估会在路径检查阶段停止；恢复数据后再生成混淆矩阵、PR/F1 曲线及正式指标。
 
 普通停止或重建容器不会删除数据：
 
@@ -181,7 +197,7 @@ npm run dev
 推理服务可通过以下变量本地运行：
 
 ```powershell
-$env:MODEL_PATH='..\..\ultralytics-main\runs\detect\best.pt'
+$env:MODEL_PATH='..\..\ultralytics-main\runs\detect\best.onnx'
 $env:UPLOAD_ROOT='.\data\uploads'
 python detect.py
 ```
@@ -189,7 +205,7 @@ python detect.py
 ## 常见问题
 
 - `inference` 长时间处于 `starting`：模型首次加载较慢，可运行 `docker compose logs inference` 查看详情。
-- 模型挂载失败：确认 `.env` 中 `MODEL_PATH` 指向存在的文件，而不是目录。
+- 模型挂载失败：确认 `.env` 中 `ONNX_MODEL_PATH` 或 `PYTORCH_MODEL_PATH` 指向存在的文件，而不是目录。
 - 端口占用：修改 `.env` 中对应的 `*_PORT`，然后重新启动。
 - Apple Silicon 构建较慢：首次安装 ARM64 PyTorch/Ultralytics 依赖需要较长时间，后续会使用 Docker 缓存。
 - GPU 容器无法启动：先通过 `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` 验证宿主机 GPU 容器环境。
@@ -198,4 +214,4 @@ python detect.py
 
 前三阶段已完成工程标准化、跨平台容器配置、后端可靠性和前端体验改造，包括 Flyway、UUID 文件名、严格图片校验、数据库分页、状态闭环、超时重试、异步批次进度与取消重试、统一错误响应、Swagger、响应式界面、异常恢复、路由拆包和文件存储/前端状态单元测试。
 
-后续仍需完成统一模型训练/验证流程、ONNX 推理、更完整的集成与端到端测试，以及 Linux/macOS/移动浏览器的正式验收矩阵。
+第四阶段已提供统一 6 类训练/验证/导出/基准入口和 ONNX CPU 推理；仍需恢复原数据集以独立复算论文指标，并补充更完整的集成、端到端测试和跨平台验收矩阵。

@@ -23,6 +23,7 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 - 使用 Flyway 自动创建及升级数据库，历史列表由数据库原生分页。
 - 提供统一错误响应、正确 HTTP 状态码和 OpenAPI/Swagger 文档。
 - 提供 CPU 和 NVIDIA GPU 两种推理容器。
+- CPU 默认使用 ONNX Runtime，GPU 保留 PyTorch CUDA 权重；推理类别直接读取模型元数据。
 - 提供服务健康检查、数据库自动建表和持久化数据卷。
 - 前端统一处理业务错误、超时、断网和服务不可用，并提供桌面、平板和手机响应式布局。
 
@@ -95,7 +96,10 @@ wood/
    ├─ wood_detect_backend/wood_backend/
    ├─ wood_detect_python/wood_detect/
    └─ ultralytics-main/
-      └─ runs/detect/best.pt
+      ├─ train.py / evaluate.py / export_onnx.py / benchmark.py
+      └─ runs/detect/
+         ├─ best.pt
+         └─ best.onnx
 ```
 
 ## 快速开始
@@ -194,7 +198,8 @@ cp .env.example .env
 | `DB_USERNAME` | `wood` | 数据库业务用户 |
 | `DB_PASSWORD` | `wood_change_me` | 数据库业务用户密码 |
 | `DB_ROOT_PASSWORD` | `root_change_me` | 数据库 root 密码 |
-| `MODEL_PATH` | `./ultralytics-main/runs/detect/best.pt` | 宿主机模型路径 |
+| `ONNX_MODEL_PATH` | `./ultralytics-main/runs/detect/best.onnx` | CPU 推理模型路径 |
+| `PYTORCH_MODEL_PATH` | `./ultralytics-main/runs/detect/best.pt` | GPU 推理模型路径 |
 | `MODEL_DEVICE` | `0` | GPU 设备编号 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 检测置信度阈值 |
 | `IMAGE_SIZE` | `640` | 模型输入尺寸 |
@@ -260,7 +265,20 @@ Compose 创建两个命名卷：
 - `wood-detect-db-data`：保存 MariaDB 数据。
 - `wood-detect-uploads`：保存上传原图与推理结果图，并由后端和推理服务共享。
 
-模型文件通过只读方式挂载至推理容器内的 `/models/best.pt`。修改 `.env` 中的 `MODEL_PATH` 可以切换模型，而不需要重新制作镜像。
+CPU 模式把 `ONNX_MODEL_PATH` 只读挂载到 `/models/best.onnx`；GPU 覆盖配置把 `PYTORCH_MODEL_PATH` 挂载到 `/models/best.pt`。修改对应变量即可切换模型，不需要重新制作镜像。
+
+## 模型训练与评估
+
+统一入口位于 `程序源码/ultralytics-main`：
+
+```bash
+python train.py --config configs/train.yaml
+python evaluate.py --model runs/detect/best.pt --data yolo-bvn.yaml
+python export_onnx.py --model runs/detect/best.pt --imgsz 896 --opset 17
+python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source path/to/images --device cpu
+```
+
+模型报告记录了权重哈希、训练参数、类别、检查点历史指标、Wise-IoU 核实结果和 CPU 烟雾基准，详见 `程序源码/ultralytics-main/MODEL_REPORT.md`。仓库缺少原始数据集时，训练和评估入口会明确失败，不会生成伪造指标。
 
 数据库结构不再依赖仅首次启动执行的初始化 SQL。后端启动时会通过 `src/main/resources/db/migration` 中的 Flyway 脚本检查并升级结构；迁移记录保存在 `flyway_schema_history` 表中。
 
@@ -336,8 +354,7 @@ python detect.py
 
 后续重点：
 
-- 统一 6 类模型训练、验证、导出与基准测试流程。
-- 增加 ONNX CPU 推理方案。
+- 恢复不可变版本的原始数据集，重新生成混淆矩阵、PR/F1 曲线并独立复算论文指标。
 - 实现高分辨率切片检测、质量评分和人工复核闭环。
 - 补充单元测试、集成测试、端到端测试和跨平台验收。
 
@@ -347,7 +364,7 @@ python detect.py
 
 - 当前仓库未包含训练数据集，因此不能直接完整复现模型训练。
 - 跨平台配置已经建立，但 Windows、Linux、macOS 和移动浏览器仍需完成正式验收矩阵。
-- 当前 PyTorch 模型推理依赖 Ultralytics；ONNX 跨平台模型尚未提供。
+- 现有指标来自 `best.pt` 检查点记录；因验证集缺失，尚不能独立复算混淆矩阵、PR/F1 曲线和论文指标。
 - FP16 仅适用于 CUDA 推理环境；CPU 模式请选择 AUTO 或 FP32。
 
 ## 许可证说明
