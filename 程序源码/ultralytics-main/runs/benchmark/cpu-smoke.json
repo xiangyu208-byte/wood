@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-09-25T12:17:39.000097+00:00",
+  "created_at": "2026-09-25T12:28:23.166955+00:00",
   "torch_cuda_available": false,
   "imgsz": 896,
-  "source": "/workspace/wood_detect_frontend/src/assets/straw.webp",
+  "source": "/samples/wood-dataset-sample.png",
   "results": [
     {
       "model": "/workspace/ultralytics-main/runs/detect/best.pt",
@@ -18,14 +18,14 @@
       "device": "cpu",
       "images": 1,
       "repeat": 3,
-      "detections_last_run": 0,
+      "detections_last_run": 3,
       "latency_ms_per_image": {
-        "mean": 104.76492466720326,
-        "median": 104.83061899867607,
-        "min": 100.57301400229335,
-        "max": 108.89114100064035
+        "mean": 151.98252233555345,
+        "median": 154.87618500264944,
+        "min": 145.31725600318168,
+        "max": 155.75412600082927
       },
-      "throughput_images_per_second": 9.545179392593509
+      "throughput_images_per_second": 6.5797039332730485
     },
     {
       "model": "/workspace/ultralytics-main/runs/detect/best.onnx",
@@ -41,14 +41,14 @@
       "device": "cpu",
       "images": 1,
       "repeat": 3,
-      "detections_last_run": 0,
+      "detections_last_run": 3,
       "latency_ms_per_image": {
-        "mean": 80.07125733395999,
-        "median": 79.75604700186523,
-        "min": 74.08281999960309,
-        "max": 86.37490500041167
+        "mean": 107.06522166583454,
+        "median": 99.69022199948085,
+        "min": 96.28232699833461,
+        "max": 125.22311599968816
       },
-      "throughput_images_per_second": 12.488875949945623
+      "throughput_images_per_second": 9.340101149943342
     }
   ]
 }

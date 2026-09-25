@@ -1,6 +1,8 @@
 {
-  "createdAt": "2026-09-25T12:08:44.748479+00:00",
-  "source": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+  "createdAt": "2026-09-25T12:26:46.384194+00:00",
+  "source": "/tmp/phase5-wood-sample.png",
+  "sampleName": "论文内嵌木材缺陷样本",
+  "sampleNote": "从项目论文文档的历史识别原图区域裁取；木材图像真实，但无独立 YOLO 标签，因此仅用于工程链路与耗时对比，不用于精度复评。",
   "labels": null,
   "confidenceThreshold": 0.25,
   "iouThreshold": 0.5,
@@ -11,18 +13,18 @@
       "actualModes": [
         "FAST_WHOLE"
       ],
-      "meanDurationMs": 83.0,
-      "meanDetections": 0.0,
+      "meanDurationMs": 116.0,
+      "meanDetections": 2.0,
       "precision": null,
       "recall": null,
       "samples": [
         {
-          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "image": "phase5-wood-sample.png",
           "actualMode": "FAST_WHOLE",
           "decisionReason": "REQUESTED_FAST",
-          "durationMs": 83,
+          "durationMs": 116,
           "tileCount": 1,
-          "detections": 0
+          "detections": 2
         }
       ]
     },
@@ -31,18 +33,18 @@
       "actualModes": [
         "ADAPTIVE_TILED"
       ],
-      "meanDurationMs": 409.0,
-      "meanDetections": 1.0,
+      "meanDurationMs": 353.0,
+      "meanDetections": 3.0,
       "precision": null,
       "recall": null,
       "samples": [
         {
-          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "image": "phase5-wood-sample.png",
           "actualMode": "ADAPTIVE_TILED",
-          "decisionReason": "NO_FIRST_PASS_DETECTION",
-          "durationMs": 409,
-          "tileCount": 5,
-          "detections": 1
+          "decisionReason": "SMALL_FIRST_PASS_TARGET",
+          "durationMs": 353,
+          "tileCount": 2,
+          "detections": 3
         }
       ]
     },
@@ -51,18 +53,18 @@
       "actualModes": [
         "TILED_ACCURATE"
       ],
-      "meanDurationMs": 374.0,
-      "meanDetections": 1.0,
+      "meanDurationMs": 206.0,
+      "meanDetections": 3.0,
       "precision": null,
       "recall": null,
       "samples": [
         {
-          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "image": "phase5-wood-sample.png",
           "actualMode": "TILED_ACCURATE",
           "decisionReason": "REQUESTED_ACCURATE",
-          "durationMs": 374,
-          "tileCount": 4,
-          "detections": 1
+          "durationMs": 206,
+          "tileCount": 1,
+          "detections": 3
         }
       ]
     }

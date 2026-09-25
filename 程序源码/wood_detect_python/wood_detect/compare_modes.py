@@ -31,6 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--url", default="http://127.0.0.1:8001/predict")
     parser.add_argument("--confidence", type=float, default=0.25)
     parser.add_argument("--iou", type=float, default=0.5)
+    parser.add_argument("--sample-name", help="报告中展示的样本名称，默认使用源文件名")
+    parser.add_argument("--sample-note", help="样本来源、标注状态等说明")
     parser.add_argument("--output", default="/data/uploads/reports/phase5-mode-comparison.json")
     return parser.parse_args()
 
@@ -125,6 +127,10 @@ def markdown_report(report: dict) -> str:
         "",
         f"生成时间：{report['createdAt']}",
         "",
+        f"测试样本：{report['sampleName']}（{report['imageCount']} 张）",
+        "",
+        f"样本说明：{report['sampleNote']}",
+        "",
         "| 模式 | 实际策略 | 平均耗时 | 平均检测数 | Precision | Recall |",
         "|---|---|---:|---:|---:|---:|",
     ]
@@ -166,7 +172,7 @@ def main() -> None:
             detection_counts.append(payload["totalCount"])
             actual_modes.add(payload["actualMode"])
             sample = {
-                "image": str(image),
+                "image": image.name,
                 "actualMode": payload["actualMode"],
                 "decisionReason": payload["decisionReason"],
                 "durationMs": payload["inferenceDurationMs"],
@@ -196,6 +202,8 @@ def main() -> None:
     report = {
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "source": str(Path(args.source).resolve()),
+        "sampleName": args.sample_name or Path(args.source).name,
+        "sampleNote": args.sample_note or "未提供样本来源说明",
         "labels": str(labels_dir) if labels_dir else None,
         "confidenceThreshold": args.confidence,
         "iouThreshold": args.iou,
