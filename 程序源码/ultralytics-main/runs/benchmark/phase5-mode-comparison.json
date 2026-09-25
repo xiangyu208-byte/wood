@@ -1,0 +1,70 @@
+{
+  "createdAt": "2026-09-25T12:08:44.748479+00:00",
+  "source": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+  "labels": null,
+  "confidenceThreshold": 0.25,
+  "iouThreshold": 0.5,
+  "imageCount": 1,
+  "modes": [
+    {
+      "requestedMode": "FAST",
+      "actualModes": [
+        "FAST_WHOLE"
+      ],
+      "meanDurationMs": 83.0,
+      "meanDetections": 0.0,
+      "precision": null,
+      "recall": null,
+      "samples": [
+        {
+          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "actualMode": "FAST_WHOLE",
+          "decisionReason": "REQUESTED_FAST",
+          "durationMs": 83,
+          "tileCount": 1,
+          "detections": 0
+        }
+      ]
+    },
+    {
+      "requestedMode": "STANDARD",
+      "actualModes": [
+        "ADAPTIVE_TILED"
+      ],
+      "meanDurationMs": 409.0,
+      "meanDetections": 1.0,
+      "precision": null,
+      "recall": null,
+      "samples": [
+        {
+          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "actualMode": "ADAPTIVE_TILED",
+          "decisionReason": "NO_FIRST_PASS_DETECTION",
+          "durationMs": 409,
+          "tileCount": 5,
+          "detections": 1
+        }
+      ]
+    },
+    {
+      "requestedMode": "ACCURATE",
+      "actualModes": [
+        "TILED_ACCURATE"
+      ],
+      "meanDurationMs": 374.0,
+      "meanDetections": 1.0,
+      "precision": null,
+      "recall": null,
+      "samples": [
+        {
+          "image": "/data/uploads/original/5d95527ac3eb46e6921d46a7620602d7.jpg",
+          "actualMode": "TILED_ACCURATE",
+          "decisionReason": "REQUESTED_ACCURATE",
+          "durationMs": 374,
+          "tileCount": 4,
+          "detections": 1
+        }
+      ]
+    }
+  ]
+}

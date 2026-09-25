@@ -389,6 +389,12 @@ public class DetectServiceImpl implements DetectService {
             record.setResultImagePath(response.getResultImagePath());
             record.setResultImageUrl(response.getResultImageUrl());
             record.setTotalCount(response.getTotalCount() == null ? 0 : response.getTotalCount());
+            record.setActualMode(response.getActualMode());
+            record.setDecisionReason(response.getDecisionReason());
+            record.setInferenceDurationMs(response.getInferenceDurationMs());
+            record.setTileCount(response.getTileCount() == null ? 1 : response.getTileCount());
+            record.setImageWidth(response.getImageWidth());
+            record.setImageHeight(response.getImageHeight());
             record.setStatus(DetectionStatus.SUCCESS);
             record.setErrorMessage(null);
             record.setUpdateTime(LocalDateTime.now());
@@ -539,13 +545,18 @@ public class DetectServiceImpl implements DetectService {
         response.setHeader("Content-Disposition", "attachment; filename=detect_history.csv");
         try (PrintWriter writer = response.getWriter()) {
             writer.write('\uFEFF');
-            writer.println("记录ID,批次号,来源类型,图片名称,原图URL,结果图URL,缺陷数,状态,失败原因,创建时间");
+            writer.println("记录ID,批次号,来源类型,图片名称,原图URL,结果图URL,缺陷数,状态,失败原因,请求模式,实际模式,模式原因,推理精度,推理耗时毫秒,推理区域数,图片尺寸,创建时间");
             for (DetectRecord record : records) {
-                writer.printf("%d,%s,%s,%s,%s,%s,%d,%s,%s,%s%n",
+                writer.printf("%d,%s,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
                         record.getId(), safeCsv(record.getBatchNo()), safeCsv(record.getSourceType()),
                         safeCsv(record.getImageName()), safeCsv(record.getImageUrl()),
                         safeCsv(record.getResultImageUrl()), record.getTotalCount() == null ? 0 : record.getTotalCount(),
                         safeCsv(record.getStatus()), safeCsv(record.getErrorMessage()),
+                        safeCsv(record.getModelMode()), safeCsv(record.getActualMode()), safeCsv(record.getDecisionReason()),
+                        safeCsv(record.getInferencePrecision()),
+                        record.getInferenceDurationMs() == null ? "" : record.getInferenceDurationMs(),
+                        record.getTileCount() == null ? "" : record.getTileCount(),
+                        safeCsv(imageSize(record)),
                         record.getCreateTime() == null ? "" : record.getCreateTime());
             }
         } catch (IOException e) {
@@ -563,7 +574,7 @@ public class DetectServiceImpl implements DetectService {
         response.setHeader("Content-Disposition", "attachment; filename=detect_history.xlsx");
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("历史记录");
-            String[] headers = {"记录ID", "批次号", "来源类型", "图片名称", "原图URL", "结果图URL", "缺陷数", "状态", "失败原因", "创建时间"};
+            String[] headers = {"记录ID", "批次号", "来源类型", "图片名称", "原图URL", "结果图URL", "缺陷数", "状态", "失败原因", "请求模式", "实际模式", "模式原因", "推理精度", "推理耗时毫秒", "推理区域数", "图片尺寸", "创建时间"};
             Row header = sheet.createRow(0);
             for (int i = 0; i < headers.length; i++) {
                 header.createCell(i).setCellValue(headers[i]);
@@ -580,7 +591,14 @@ public class DetectServiceImpl implements DetectService {
                 row.createCell(6).setCellValue(record.getTotalCount() == null ? 0 : record.getTotalCount());
                 row.createCell(7).setCellValue(nullToEmpty(record.getStatus()));
                 row.createCell(8).setCellValue(nullToEmpty(record.getErrorMessage()));
-                row.createCell(9).setCellValue(record.getCreateTime() == null ? "" : record.getCreateTime().toString());
+                row.createCell(9).setCellValue(nullToEmpty(record.getModelMode()));
+                row.createCell(10).setCellValue(nullToEmpty(record.getActualMode()));
+                row.createCell(11).setCellValue(nullToEmpty(record.getDecisionReason()));
+                row.createCell(12).setCellValue(nullToEmpty(record.getInferencePrecision()));
+                row.createCell(13).setCellValue(record.getInferenceDurationMs() == null ? 0 : record.getInferenceDurationMs());
+                row.createCell(14).setCellValue(record.getTileCount() == null ? 0 : record.getTileCount());
+                row.createCell(15).setCellValue(imageSize(record));
+                row.createCell(16).setCellValue(record.getCreateTime() == null ? "" : record.getCreateTime().toString());
             }
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
@@ -848,8 +866,14 @@ public class DetectServiceImpl implements DetectService {
         vo.setBatchNo(record.getBatchNo());
         vo.setSourceType(record.getSourceType());
         vo.setModelMode(record.getModelMode());
+        vo.setActualMode(record.getActualMode());
+        vo.setDecisionReason(record.getDecisionReason());
         vo.setConfidenceThreshold(record.getConfidenceThreshold());
         vo.setInferencePrecision(record.getInferencePrecision());
+        vo.setInferenceDurationMs(record.getInferenceDurationMs());
+        vo.setTileCount(record.getTileCount());
+        vo.setImageWidth(record.getImageWidth());
+        vo.setImageHeight(record.getImageHeight());
         vo.setImageName(record.getImageName());
         vo.setImageUrl(record.getImageUrl());
         vo.setResultImageUrl(record.getResultImageUrl());
@@ -872,8 +896,14 @@ public class DetectServiceImpl implements DetectService {
         vo.setErrorMessage(record.getErrorMessage());
         vo.setSourceType(record.getSourceType());
         vo.setModelMode(record.getModelMode());
+        vo.setActualMode(record.getActualMode());
+        vo.setDecisionReason(record.getDecisionReason());
         vo.setConfidenceThreshold(record.getConfidenceThreshold());
         vo.setInferencePrecision(record.getInferencePrecision());
+        vo.setInferenceDurationMs(record.getInferenceDurationMs());
+        vo.setTileCount(record.getTileCount());
+        vo.setImageWidth(record.getImageWidth());
+        vo.setImageHeight(record.getImageHeight());
         vo.setCreateTime(record.getCreateTime());
         vo.setDetails(details.stream().map(this::toDetailVO).toList());
         return vo;
@@ -947,6 +977,13 @@ public class DetectServiceImpl implements DetectService {
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private String imageSize(DetectRecord record) {
+        if (record.getImageWidth() == null || record.getImageHeight() == null) {
+            return "";
+        }
+        return record.getImageWidth() + "x" + record.getImageHeight();
     }
 
     private String safeCsv(String value) {

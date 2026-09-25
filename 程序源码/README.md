@@ -95,6 +95,11 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `MODEL_DEVICE` | `0` | GPU 编号，仅 GPU 覆盖配置使用 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 推理置信度阈值 |
 | `IMAGE_SIZE` | `640` | 推理输入尺寸 |
+| `TILE_IMAGE_SIZE` | `896` | 精细模式切片尺寸 |
+| `TILE_OVERLAP` | `0.20` | 切片重叠比例 |
+| `NMS_IOU_THRESHOLD` | `0.50` | 跨切片按类别 NMS 阈值 |
+| `AUTO_MAX_DIMENSION` | `2560` | 自适应切片最长边阈值 |
+| `AUTO_PIXEL_COUNT` | `4000000` | 自适应切片像素数阈值 |
 | `MAX_FILE_SIZE` / `MAX_REQUEST_SIZE` | `20MB` / `100MB` | 上传大小限制 |
 | `ALLOWED_IMAGE_EXTENSIONS` | `jpg,jpeg,png,bmp` | 允许的图片扩展名 |
 | `MAX_IMAGE_WIDTH` / `MAX_IMAGE_HEIGHT` | `10000` | 最大图片宽高 |
@@ -158,6 +163,23 @@ python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source 
 
 详细模型身份、历史指标和复现边界见 `ultralytics-main/MODEL_REPORT.md`。数据集不在仓库中，训练和评估会在路径检查阶段停止；恢复数据后再生成混淆矩阵、PR/F1 曲线及正式指标。
 
+## 自适应高分辨率推理
+
+- 快速整图：512px 单次推理。
+- 自适应：先执行 640px 整图推理，根据分辨率、首轮置信度和目标尺寸决定是否升级。
+- 精细切片：896px 切片、20% 重叠，坐标还原后使用按类别 NMS 合并重复框。
+
+检测结果和历史记录会显示请求模式、实际策略、选择依据、推理耗时和区域数。恢复验证集后，可运行：
+
+```bash
+docker compose exec inference python compare_modes.py \
+  --source /data/uploads/original \
+  --labels /path/to/labels \
+  --output /data/uploads/reports/phase5-mode-comparison.json
+```
+
+不提供 `--labels` 时只输出耗时和检测数，不会生成伪造的精度指标。
+
 普通停止或重建容器不会删除数据：
 
 ```bash
@@ -212,6 +234,6 @@ python detect.py
 
 ## 当前完成范围与边界
 
-前三阶段已完成工程标准化、跨平台容器配置、后端可靠性和前端体验改造，包括 Flyway、UUID 文件名、严格图片校验、数据库分页、状态闭环、超时重试、异步批次进度与取消重试、统一错误响应、Swagger、响应式界面、异常恢复、路由拆包和文件存储/前端状态单元测试。
+前五阶段已完成工程标准化、跨平台容器、后端可靠性、前端体验、统一模型流水线和自适应高分辨率推理，包括重叠切片、坐标还原、按类别 NMS、实际模式与耗时追踪。
 
-第四阶段已提供统一 6 类训练/验证/导出/基准入口和 ONNX CPU 推理；仍需恢复原数据集以独立复算论文指标，并补充更完整的集成、端到端测试和跨平台验收矩阵。
+第五阶段已提供快速整图、自适应和精细切片推理，贯通实际策略、耗时与切片元数据；仍需恢复原数据集以独立复算模式精度，并补充更完整的集成、端到端测试和跨平台验收矩阵。

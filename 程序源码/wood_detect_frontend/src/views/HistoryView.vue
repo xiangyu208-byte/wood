@@ -69,7 +69,7 @@
             <el-table-column label="状态" width="126"><template #default="{ row }"><StatusBadge :status="row.status" /></template></el-table-column>
             <el-table-column prop="totalCount" label="缺陷数" width="86" />
             <el-table-column prop="sourceType" label="来源" width="90"><template #default="{ row }">{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</template></el-table-column>
-            <el-table-column label="参数" min-width="140"><template #default="{ row }"><span>{{ modeLabel(row.modelMode) }} · {{ row.confidenceThreshold ?? '—' }}</span></template></el-table-column>
+            <el-table-column label="推理策略" min-width="180"><template #default="{ row }"><span>{{ actualModeLabel(row.actualMode) }} · {{ formatDuration(row.inferenceDurationMs) }}</span></template></el-table-column>
             <el-table-column prop="createTime" label="创建时间" min-width="170" />
             <el-table-column label="操作" width="170" fixed="right">
               <template #default="{ row }">
@@ -83,7 +83,7 @@
         <ul class="mobile-records" aria-label="历史记录列表">
           <li v-for="row in historyList" :key="row.recordId">
             <div class="mobile-record-head"><strong>{{ row.imageName }}</strong><StatusBadge :status="row.status" /></div>
-            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
+            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
             <p v-if="row.errorMessage" class="mobile-error">{{ row.errorMessage }}</p>
             <div class="actions"><el-button type="primary" plain @click="goDetail(row.recordId)">查看详情</el-button><el-button type="danger" text @click="handleDelete(row.recordId)">删除</el-button></div>
           </li>
@@ -109,6 +109,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { batchDeleteRecords, deleteRecord, deleteRecordsByCondition, getHistory } from '../api/detect'
+import { actualModeLabel, formatDuration } from '../utils/detection'
 
 const router = useRouter()
 const historyList = ref([])
@@ -145,8 +146,6 @@ function handleSearch() { page.value = 1; loadHistory() }
 function handleReset() { queryForm.value = emptyQuery(); page.value = 1; loadHistory() }
 function handleSelectionChange(rows) { selectedIds.value = rows.map(row => row.recordId) }
 function goDetail(id) { router.push(`/history/${id}`) }
-function modeLabel(mode) { return ({ FAST: '快速', STANDARD: '标准', ACCURATE: '精确' }[mode]) || '标准' }
-
 async function confirmDelete(message, action) {
   try {
     await ElMessageBox.confirm(message, '删除确认', { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' })

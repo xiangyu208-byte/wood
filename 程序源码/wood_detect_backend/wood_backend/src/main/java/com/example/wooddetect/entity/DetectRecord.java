@@ -45,9 +45,21 @@ public class DetectRecord {
 
     private String modelMode;
 
+    private String actualMode;
+
+    private String decisionReason;
+
     private Double confidenceThreshold;
 
     private String inferencePrecision;
+
+    private Long inferenceDurationMs;
+
+    private Integer tileCount;
+
+    private Integer imageWidth;
+
+    private Integer imageHeight;
 
     private LocalDateTime createTime;
 

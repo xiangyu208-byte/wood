@@ -56,11 +56,25 @@ public class DetectResponseVO {
     /** 推理模式：FAST / STANDARD / ACCURATE */
     private String modelMode;
 
+    /** 实际执行模式 */
+    private String actualMode;
+
+    /** 自动模式选择原因 */
+    private String decisionReason;
+
     /** 置信度阈值 */
     private Double confidenceThreshold;
 
     /** 推理精度：AUTO / FP32 / FP16 */
     private String inferencePrecision;
+
+    private Long inferenceDurationMs;
+
+    private Integer tileCount;
+
+    private Integer imageWidth;
+
+    private Integer imageHeight;
 
     /**
      * 识别时间

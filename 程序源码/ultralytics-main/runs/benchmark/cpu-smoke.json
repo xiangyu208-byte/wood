@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-09-24T15:44:00.181550+00:00",
+  "created_at": "2026-09-25T12:17:39.000097+00:00",
   "torch_cuda_available": false,
   "imgsz": 896,
   "source": "/workspace/wood_detect_frontend/src/assets/straw.webp",
@@ -20,12 +20,12 @@
       "repeat": 3,
       "detections_last_run": 0,
       "latency_ms_per_image": {
-        "mean": 135.4012623332892,
-        "median": 135.05740999994487,
-        "min": 131.07380699989335,
-        "max": 140.07257000002937
+        "mean": 104.76492466720326,
+        "median": 104.83061899867607,
+        "min": 100.57301400229335,
+        "max": 108.89114100064035
       },
-      "throughput_images_per_second": 7.385455517678317
+      "throughput_images_per_second": 9.545179392593509
     },
     {
       "model": "/workspace/ultralytics-main/runs/detect/best.onnx",
@@ -43,12 +43,12 @@
       "repeat": 3,
       "detections_last_run": 0,
       "latency_ms_per_image": {
-        "mean": 126.70080533333324,
-        "median": 126.03021299992179,
-        "min": 124.37522699997317,
-        "max": 129.69697600010477
+        "mean": 80.07125733395999,
+        "median": 79.75604700186523,
+        "min": 74.08281999960309,
+        "max": 86.37490500041167
       },
-      "throughput_images_per_second": 7.892609659181967
+      "throughput_images_per_second": 12.488875949945623
     }
   ]
 }

@@ -12,7 +12,12 @@
 
     <dl class="summary-grid">
       <div><dt>缺陷数量</dt><dd>{{ result.totalCount ?? 0 }}</dd></div>
-      <div><dt>模型模式</dt><dd>{{ modeLabel(result.modelMode) }}</dd></div>
+      <div><dt>请求模式</dt><dd>{{ requestedModeLabel(result.modelMode) }}</dd></div>
+      <div><dt>实际模式</dt><dd>{{ actualModeLabel(result.actualMode) }}</dd></div>
+      <div><dt>选择依据</dt><dd>{{ decisionReasonLabel(result.decisionReason) }}</dd></div>
+      <div><dt>推理耗时</dt><dd>{{ formatDuration(result.inferenceDurationMs) }}</dd></div>
+      <div><dt>推理区域</dt><dd>{{ result.tileCount ?? '—' }}</dd></div>
+      <div><dt>图片尺寸</dt><dd>{{ formatImageSize(result.imageWidth, result.imageHeight) }}</dd></div>
       <div><dt>置信度阈值</dt><dd>{{ result.confidenceThreshold ?? '—' }}</dd></div>
       <div><dt>推理精度</dt><dd>{{ result.inferencePrecision || '—' }}</dd></div>
       <div><dt>检测时间</dt><dd>{{ result.createTime || '—' }}</dd></div>
@@ -48,11 +53,16 @@
 
 <script setup>
 import StatusBadge from './StatusBadge.vue'
-import { classNameZh, formatConfidence, fullImageUrl } from '../utils/detection'
+import {
+  actualModeLabel,
+  classNameZh,
+  decisionReasonLabel,
+  formatConfidence,
+  formatDuration,
+  formatImageSize,
+  fullImageUrl,
+  requestedModeLabel
+} from '../utils/detection'
 
 defineProps({ result: { type: Object, required: true } })
-
-function modeLabel(mode) {
-  return ({ FAST: '快速', STANDARD: '标准', ACCURATE: '精确' }[mode]) || mode || '—'
-}
 </script>

@@ -30,6 +30,21 @@ public class PythonDetectResponseDTO {
      */
     private Integer totalCount;
 
+    /** 实际执行模式：FAST_WHOLE / STANDARD_WHOLE / ADAPTIVE_TILED / TILED_ACCURATE */
+    private String actualMode;
+
+    /** 模式选择原因 */
+    private String decisionReason;
+
+    /** 包含图像预处理、模型推理、NMS 和绘图的总耗时 */
+    private Long inferenceDurationMs;
+
+    /** 实际推理区域数量，整图为 1 */
+    private Integer tileCount;
+
+    private Integer imageWidth;
+    private Integer imageHeight;
+
     /**
      * 检测明细列表
      */

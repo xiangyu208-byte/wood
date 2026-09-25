@@ -215,3 +215,5 @@ runs/detect/*
 !runs/benchmark/
 runs/benchmark/*
 !runs/benchmark/cpu-smoke.json
+!runs/benchmark/phase5-mode-comparison.json
+!runs/benchmark/phase5-mode-comparison.md

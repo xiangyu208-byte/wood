@@ -7,6 +7,17 @@ import cv2
 import torch
 import os
 
+from inference_pipeline import (
+    AUTO_CONFIDENCE_THRESHOLD,
+    AUTO_MAX_DIMENSION,
+    AUTO_PIXEL_COUNT,
+    NMS_IOU_THRESHOLD,
+    TILE_IMAGE_SIZE,
+    TILE_OVERLAP,
+    Detection,
+    run_inference,
+)
+
 # =========================
 # 1. FastAPI 应用
 app = FastAPI(title="Wood Defect Detection Service")
@@ -64,6 +75,12 @@ class PredictResponse(BaseModel):
     resultImagePath: str
     resultImageUrl: str
     totalCount: int
+    actualMode: str
+    decisionReason: str
+    inferenceDurationMs: int
+    tileCount: int
+    imageWidth: int
+    imageHeight: int
     details: List[DetectItem]
 
 
@@ -100,15 +117,6 @@ def resolve_device() -> Union[int, str]:
     return MODEL_DEVICE
 
 
-def resolve_inference_size(mode: str) -> int:
-    """将前端可理解的模式映射为实际推理尺寸。"""
-    return {
-        "FAST": 512,
-        "STANDARD": IMAGE_SIZE,
-        "ACCURATE": 960,
-    }[mode]
-
-
 def resolve_half_precision(precision: str, device: Union[int, str]) -> bool:
     """AUTO 在 CUDA 上使用 FP16，在 CPU 上保持 FP32。"""
     using_cuda = device != "cpu"
@@ -135,6 +143,14 @@ def health():
         "device": str(resolve_device()),
         "backend": MODEL_PATH.suffix.lower().lstrip("."),
         "classNames": class_names,
+        "adaptiveInference": {
+            "tileSize": TILE_IMAGE_SIZE,
+            "tileOverlap": TILE_OVERLAP,
+            "nmsIouThreshold": NMS_IOU_THRESHOLD,
+            "autoMaxDimension": AUTO_MAX_DIMENSION,
+            "autoPixelCount": AUTO_PIXEL_COUNT,
+            "autoConfidenceThreshold": AUTO_CONFIDENCE_THRESHOLD,
+        },
     }
 
 
@@ -146,7 +162,7 @@ def predict(req: PredictRequest):
     image_path = Path(req.imagePath)
 
     # 1. 检查图片是否存在
-    if not image_path.exists():
+    if not image_path.is_file():
         raise HTTPException(status_code=400, detail=f"图片不存在: {req.imagePath}")
 
     # 2. 读取图片
@@ -154,56 +170,66 @@ def predict(req: PredictRequest):
     if image is None:
         raise HTTPException(status_code=400, detail=f"图片读取失败: {req.imagePath}")
 
-    # 3. YOLO 推理
+    # 3. YOLO 推理。STANDARD 可根据分辨率或首轮结果自动升级到重叠切片。
     try:
         device = resolve_device()
-        results = model.predict(
-            source=str(image_path),
-            save=False,
-            conf=req.confidenceThreshold,
-            imgsz=resolve_inference_size(req.modelMode),
-            device=device,
-            half=resolve_half_precision(req.precision, device)
-        )
+
+        def predict_region(region, image_size):
+            results = model.predict(
+                source=region,
+                save=False,
+                conf=req.confidenceThreshold,
+                imgsz=image_size,
+                device=device,
+                half=resolve_half_precision(req.precision, device),
+                verbose=False,
+            )
+            if not results:
+                raise RuntimeError("模型未返回结果")
+            result = results[0]
+            detections = []
+            if result.boxes is not None and len(result.boxes) > 0:
+                for xyxy, confidence, class_id in zip(
+                    result.boxes.xyxy.cpu().numpy(),
+                    result.boxes.conf.cpu().numpy(),
+                    result.boxes.cls.cpu().numpy(),
+                ):
+                    detections.append(
+                        Detection(
+                            class_id=int(class_id),
+                            confidence=float(confidence),
+                            x1=float(xyxy[0]),
+                            y1=float(xyxy[1]),
+                            x2=float(xyxy[2]),
+                            y2=float(xyxy[3]),
+                        )
+                    )
+            return detections, normalize_model_names(result.names)
+
+        outcome = run_inference(image, req.modelMode, predict_region, IMAGE_SIZE)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"模型推理失败: {str(e)}")
 
-    if not results or len(results) == 0:
-        raise HTTPException(status_code=500, detail="模型未返回结果")
-
-    result = results[0]
-    class_names = normalize_model_names(result.names)
+    class_names = normalize_model_names(model.names)
 
     # 4. 提取检测框明细
     details = []
-    boxes = result.boxes
-
-    if boxes is not None and len(boxes) > 0:
-        xyxy_list = boxes.xyxy.cpu().numpy()
-        conf_list = boxes.conf.cpu().numpy()
-        cls_list = boxes.cls.cpu().numpy()
-
-        for xyxy, conf, cls_id in zip(xyxy_list, conf_list, cls_list):
-            x1, y1, x2, y2 = map(int, xyxy.tolist())
-            cls_id = int(cls_id)
-
-            class_name = class_names.get(cls_id, str(cls_id))
-
-            details.append(
-                DetectItem(
-                    className=class_name,
-                    confidence=round(float(conf), 4),
-                    x1=x1,
-                    y1=y1,
-                    x2=x2,
-                    y2=y2
-                )
+    for item in outcome.detections:
+        details.append(
+            DetectItem(
+                className=class_names.get(item.class_id, str(item.class_id)),
+                confidence=round(item.confidence, 4),
+                x1=round(item.x1),
+                y1=round(item.y1),
+                x2=round(item.x2),
+                y2=round(item.y2),
             )
+        )
 
     # 5. 生成带框结果图
-    plotted_image = result.plot()
+    plotted_image = outcome.plotted_image
 
     # 6. 保存结果图
     result_filename = build_result_filename(image_path)
@@ -219,6 +245,12 @@ def predict(req: PredictRequest):
         resultImagePath=str(result_image_path).replace("\\", "/"),
         resultImageUrl=build_result_image_url(result_filename),
         totalCount=len(details),
+        actualMode=outcome.actual_mode,
+        decisionReason=outcome.decision_reason,
+        inferenceDurationMs=outcome.duration_ms,
+        tileCount=outcome.tile_count,
+        imageWidth=outcome.image_width,
+        imageHeight=outcome.image_height,
         details=details
     )
 

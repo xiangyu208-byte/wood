@@ -4,14 +4,14 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 
 项目采用前后端分离架构，默认提供无需 CUDA 的 CPU 容器方案，同时保留 NVIDIA GPU 推理方案。Windows、Linux 和 macOS 可使用 Docker Compose 部署，手机和平板可作为浏览器客户端访问。
 
-> 当前仓库仍处于持续开发阶段。前三个阶段已经完成：工程可容器化运行，后端可靠性能力已落地，前端已接入异步任务、异常恢复、响应式布局与生产拆包。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
+> 当前仓库仍处于持续开发阶段。前五阶段工程内容已完成，包括容器化、后端可靠性、响应式前端、统一模型流水线和自适应高分辨率切片推理。原验证集缺失导致的精度复评项仍明确保留为阻塞。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
 
 ## 主要功能
 
 - 单张图片上传识别，并展示带检测框的结果图。
 - 多张图片同步识别，以及带总进度和逐项状态的异步批量任务。
 - 支持取消异步批次、重试失败/取消项目，以及单张重新识别。
-- 支持快速、标准、精确三种输入模式，可设置置信度阈值与 AUTO/FP32/FP16 推理精度。
+- 支持快速整图、自适应和精细切片三种模式；自适应模式会根据图片尺寸与首轮结果决定是否执行重叠切片。
 - 浏览器摄像头拍照识别。
 - 展示缺陷类别、置信度和边界框坐标。
 - 保存检测记录、原图、结果图和缺陷明细。
@@ -203,6 +203,11 @@ cp .env.example .env
 | `MODEL_DEVICE` | `0` | GPU 设备编号 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 检测置信度阈值 |
 | `IMAGE_SIZE` | `640` | 模型输入尺寸 |
+| `TILE_IMAGE_SIZE` | `896` | 精细模式切片尺寸 |
+| `TILE_OVERLAP` | `0.20` | 相邻切片重叠比例 |
+| `NMS_IOU_THRESHOLD` | `0.50` | 跨切片重复框合并阈值 |
+| `AUTO_MAX_DIMENSION` | `2560` | 自适应模式触发切片的最长边阈值 |
+| `AUTO_PIXEL_COUNT` | `4000000` | 自适应模式触发切片的像素数阈值 |
 | `MAX_FILE_SIZE` | `20MB` | 单文件上传限制 |
 | `MAX_REQUEST_SIZE` | `100MB` | 单次请求总大小限制 |
 | `ALLOWED_IMAGE_EXTENSIONS` | `jpg,jpeg,png,bmp` | 允许的图片扩展名 |
@@ -277,6 +282,14 @@ python evaluate.py --model runs/detect/best.pt --data yolo-bvn.yaml
 python export_onnx.py --model runs/detect/best.pt --imgsz 896 --opset 17
 python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source path/to/images --device cpu
 ```
+
+在线推理支持以下实际策略：
+
+- `FAST`：整图 512px 推理，适合快速预览。
+- `STANDARD`：先执行整图推理；高分辨率、首轮无结果、低置信度或小目标会自动升级为 896px、20% 重叠切片。
+- `ACCURATE`：始终执行重叠切片，局部坐标还原到原图后使用按类别 NMS 合并重复框。
+
+每条检测记录会保存实际执行模式、模式选择原因、推理区域数、图片尺寸和端到端推理耗时。恢复带标签验证集后，可在推理容器中运行 `compare_modes.py` 对比三种模式。
 
 模型报告记录了权重哈希、训练参数、类别、检查点历史指标、Wise-IoU 核实结果和 CPU 烟雾基准，详见 `程序源码/ultralytics-main/MODEL_REPORT.md`。仓库缺少原始数据集时，训练和评估入口会明确失败，不会生成伪造指标。
 

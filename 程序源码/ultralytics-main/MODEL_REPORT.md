@@ -2,7 +2,7 @@
 
 ## 结论
 
-当前 `best.pt` 是 Ultralytics 8.4.21 训练的 6 类 YOLOv8s-C2fPSA 检测模型。第四阶段已从该权重导出固定输入尺寸 896×896、opset 17 的 `best.onnx`，并使用 ONNX Runtime `CPUExecutionProvider` 完成计算图校验、零张量前向和真实图片推理烟雾测试。
+当前 `best.pt` 是 Ultralytics 8.4.21 训练的 6 类 YOLOv8s-C2fPSA 检测模型。第五阶段将 ONNX 更新为动态输入尺寸、opset 17 的 `best.onnx`，并使用 ONNX Runtime `CPUExecutionProvider` 完成计算图校验以及 512×512、640×640、896×896 三种尺寸前向验证，以支持快速整图和高分辨率切片推理。
 
 仓库不包含训练/验证数据集，因此本报告把权重内保存的历史指标与可独立复现的评估结果严格分开。Precision、Recall 和 mAP 是权重检查点携带的历史验证结果，目前不能通过 `evaluate.py` 独立复算；混淆矩阵、PR 曲线和 F1 曲线也必须在原验证集恢复后重新生成。
 
@@ -13,11 +13,11 @@
 | PyTorch 权重 | `runs/detect/best.pt` |
 | PyTorch SHA-256 | `c6b6ba26110d9257f5f3b9a0fa04800030a25a9ff2198b7b051a99597bfb0535` |
 | ONNX 权重 | `runs/detect/best.onnx` |
-| ONNX SHA-256 | `695ca0730f2153bd9d98f8ea937bc7b7b05fc6473579c4ef32f1863690e8d3c2` |
+| ONNX SHA-256 | `d5bd6032be1bb9f0be979e92b30718670c0b282bf701e21d0f58e50948678a17` |
 | Ultralytics | `8.4.21` |
 | 结构 | YOLOv8s，Backbone 含 2 个 C2fPSA 模块 |
 | 参数量 | 9,915,906（融合后 9,904,226） |
-| 输入尺寸 | 896×896 |
+| 输入尺寸 | 动态高度和宽度；当前使用 512、640、896 三档 |
 | 类别数 | 6 |
 | 数据版本 | 不可用，原始数据集未随仓库提供 |
 
@@ -53,12 +53,12 @@
 
 ## CPU 推理烟雾基准
 
-2026-09-24 在 Docker Linux、Intel Core i9-14900HX、单张非木材 WebP、896×896、1 次预热和 3 次计时条件下：
+2026-09-25 在 Docker Linux、Intel Core i9-14900HX、单张非木材 WebP、896×896、1 次预热和 3 次计时条件下，对当前动态 ONNX 重新测试：
 
 | 格式 | 平均延迟 | 中位延迟 | 吞吐量 |
 |---|---:|---:|---:|
-| PyTorch CPU | 135.40 ms/张 | 135.06 ms/张 | 7.39 张/秒 |
-| ONNX Runtime CPU | 126.70 ms/张 | 126.03 ms/张 | 7.89 张/秒 |
+| PyTorch CPU | 104.76 ms/张 | 104.83 ms/张 | 9.55 张/秒 |
+| ONNX Runtime CPU | 80.07 ms/张 | 79.76 ms/张 | 12.49 张/秒 |
 
 该测试只证明两种后端能够完成真实图片推理，不代表木材数据集上的精度，也不是正式性能结论。机器、线程、图片数量和输入尺寸变化都会改变结果；正式报告应对验证集多轮测试并记录硬件与线程配置。
 

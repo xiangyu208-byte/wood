@@ -66,10 +66,15 @@ def main() -> None:
 
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
     input_info = session.get_inputs()[0]
-    shape = [1, 3, args.imgsz, args.imgsz]
-    outputs = session.run(None, {input_info.name: np.zeros(shape, dtype=np.float32)})
-    if not outputs:
-        raise RuntimeError("ONNX Runtime 未返回输出")
+    validation_sizes = sorted({512, 640, args.imgsz}) if args.dynamic else [args.imgsz]
+    smoke_tests = []
+    outputs = []
+    for size in validation_sizes:
+        shape = [1, 3, size, size]
+        outputs = session.run(None, {input_info.name: np.zeros(shape, dtype=np.float32)})
+        if not outputs:
+            raise RuntimeError(f"ONNX Runtime 未返回输出，输入尺寸: {size}")
+        smoke_tests.append({"imgsz": size, "output_shapes": [list(value.shape) for value in outputs]})
 
     metadata = session.get_modelmeta().custom_metadata_map
     payload = {
@@ -91,6 +96,7 @@ def main() -> None:
         "providers": session.get_providers(),
         "input": {"name": input_info.name, "shape": input_info.shape, "type": input_info.type},
         "output_shapes": [list(value.shape) for value in outputs],
+        "smoke_tests": smoke_tests,
         "metadata": metadata,
         "smoke_test": "passed",
     }
