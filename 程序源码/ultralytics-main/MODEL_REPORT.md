@@ -30,6 +30,8 @@
 5. `split`（裂纹）
 6. `wave`（波纹）
 
+在线推理服务还可能返回 `suspected_anomaly`。它不是模型类别，而是首轮及切片结果覆盖不足时，对木材图片内部明显暗部或空洞给出的人工复核候选；其数值为候选强度，不能作为模型置信度，也不能纳入本模型的 Precision、Recall 或 mAP 计算。当前六类权重没有“腐朽/空洞”类别。
+
 ## 权重内保存的训练配置
 
 权重记录的主要参数为：500 epochs、batch 32、imgsz 896、AdamW、lr0 0.001、lrf 0.01、weight decay 0.0005、warmup 5、cosine LR、patience 50、close mosaic 15、seed 0。统一配置见 `configs/train.yaml`，网络结构见 `configs/yolov8s-c2fpsa.yaml`。

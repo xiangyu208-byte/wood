@@ -14,6 +14,8 @@ from inference_pipeline import (
     NMS_IOU_THRESHOLD,
     TILE_IMAGE_SIZE,
     TILE_OVERLAP,
+    SUSPECTED_ANOMALY_CLASS_ID,
+    SUSPECTED_ANOMALY_CLASS_NAME,
     Detection,
     run_inference,
 )
@@ -212,7 +214,10 @@ def predict(req: PredictRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"模型推理失败: {str(e)}")
 
-    class_names = normalize_model_names(model.names)
+    class_names = {
+        **normalize_model_names(model.names),
+        SUSPECTED_ANOMALY_CLASS_ID: SUSPECTED_ANOMALY_CLASS_NAME,
+    }
 
     # 4. 提取检测框明细
     details = []
@@ -244,7 +249,7 @@ def predict(req: PredictRequest):
         success=True,
         resultImagePath=str(result_image_path).replace("\\", "/"),
         resultImageUrl=build_result_image_url(result_filename),
-        totalCount=len(details),
+        totalCount=sum(item.class_id != SUSPECTED_ANOMALY_CLASS_ID for item in outcome.detections),
         actualMode=outcome.actual_mode,
         decisionReason=outcome.decision_reason,
         inferenceDurationMs=outcome.duration_ms,

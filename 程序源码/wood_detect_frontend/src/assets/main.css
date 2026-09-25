@@ -151,6 +151,7 @@ img { display: block; max-width: 100%; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .inline-error { margin: 0 0 16px; padding: 12px 14px; border: 1px solid color-mix(in oklch, var(--color-danger) 32%, var(--color-border)); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--color-danger) 7%, var(--color-surface)); color: var(--color-danger); }
+.inline-warning { margin: 0 0 16px; padding: 12px 14px; border: 1px solid color-mix(in oklch, var(--color-warning) 34%, var(--color-border)); border-radius: var(--radius-sm); background: color-mix(in oklch, var(--color-warning) 8%, var(--color-surface)); color: color-mix(in oklch, var(--color-warning) 88%, var(--color-text)); }
 .summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin: 0 0 18px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-border); }
 .summary-grid div { min-width: 0; padding: 12px; background: var(--color-surface); }
 .summary-grid dt { color: var(--color-text-muted); font-size: 12px; }

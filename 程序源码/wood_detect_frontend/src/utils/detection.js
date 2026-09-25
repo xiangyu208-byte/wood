@@ -13,7 +13,8 @@ export const CLASS_NAME_MAP = {
   edge_knot: '边节',
   small_knot: '小节',
   split: '裂纹',
-  wave: '波纹'
+  wave: '波纹',
+  suspected_anomaly: '疑似异常（需复核）'
 }
 
 export const REQUESTED_MODE_LABELS = {
@@ -36,6 +37,7 @@ export const DECISION_REASON_LABELS = {
   NO_FIRST_PASS_DETECTION: '首轮未检出目标，自动复查局部',
   LOW_FIRST_PASS_CONFIDENCE: '首轮置信度较低，自动复查局部',
   SMALL_FIRST_PASS_TARGET: '首轮发现小目标，自动复查局部',
+  EDGE_ONLY_FIRST_PASS: '首轮结果仅位于图片边缘，自动复查整幅图片',
   FIRST_PASS_CONFIDENT: '首轮结果稳定，保留整图推理'
 }
 
@@ -50,6 +52,19 @@ export function classNameZh(className) {
 export function formatConfidence(value) {
   const number = Number(value)
   return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—'
+}
+
+export function detailScoreLabel(detail) {
+  const score = formatConfidence(detail?.confidence)
+  return detail?.className === 'suspected_anomaly' ? `候选强度 ${score}` : score
+}
+
+export function hasSuspectedAnomaly(details = []) {
+  return details.some(detail => detail.className === 'suspected_anomaly')
+}
+
+export function reviewCandidateCount(details = []) {
+  return details.filter(detail => detail.className === 'suspected_anomaly').length
 }
 
 export function requestedModeLabel(mode) {

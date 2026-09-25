@@ -131,8 +131,8 @@ def markdown_report(report: dict) -> str:
         "",
         f"样本说明：{report['sampleNote']}",
         "",
-        "| 模式 | 实际策略 | 平均耗时 | 平均检测数 | Precision | Recall |",
-        "|---|---|---:|---:|---:|---:|",
+        "| 模式 | 实际策略 | 平均耗时 | 平均模型检测数 | 平均复核候选数 | Precision | Recall |",
+        "|---|---|---:|---:|---:|---:|---:|",
     ]
     for mode in report["modes"]:
         precision = "待标签" if mode["precision"] is None else f"{mode['precision']:.4f}"
@@ -140,7 +140,7 @@ def markdown_report(report: dict) -> str:
         strategies = ", ".join(mode["actualModes"])
         lines.append(
             f"| {mode['requestedMode']} | {strategies} | {mode['meanDurationMs']:.2f} ms | "
-            f"{mode['meanDetections']:.2f} | {precision} | {recall} |"
+            f"{mode['meanDetections']:.2f} | {mode['meanReviewCandidates']:.2f} | {precision} | {recall} |"
         )
     lines.extend(
         [
@@ -162,6 +162,7 @@ def main() -> None:
     for requested_mode in ("FAST", "STANDARD", "ACCURATE"):
         durations: list[int] = []
         detection_counts: list[int] = []
+        review_candidate_counts: list[int] = []
         actual_modes: set[str] = set()
         true_positive = false_positive = false_negative = 0
         samples = []
@@ -169,7 +170,14 @@ def main() -> None:
             payload = request_prediction(args.url, image, requested_mode, args.confidence)
             predictions = response_boxes(payload)
             durations.append(payload["inferenceDurationMs"])
-            detection_counts.append(payload["totalCount"])
+            review_candidates = sum(
+                item.get("className") == "suspected_anomaly" for item in payload.get("details", [])
+            )
+            model_detections = sum(
+                item.get("className") != "suspected_anomaly" for item in payload.get("details", [])
+            )
+            detection_counts.append(model_detections)
+            review_candidate_counts.append(review_candidates)
             actual_modes.add(payload["actualMode"])
             sample = {
                 "image": image.name,
@@ -177,7 +185,8 @@ def main() -> None:
                 "decisionReason": payload["decisionReason"],
                 "durationMs": payload["inferenceDurationMs"],
                 "tileCount": payload["tileCount"],
-                "detections": payload["totalCount"],
+                "detections": model_detections,
+                "reviewCandidates": review_candidates,
             }
             if labels_dir:
                 tp, fp, fn = match_counts(predictions, load_labels(labels_dir, image), args.iou)
@@ -194,6 +203,7 @@ def main() -> None:
                 "actualModes": sorted(actual_modes),
                 "meanDurationMs": statistics.fmean(durations),
                 "meanDetections": statistics.fmean(detection_counts),
+                "meanReviewCandidates": statistics.fmean(review_candidate_counts),
                 "precision": precision,
                 "recall": recall,
                 "samples": samples,

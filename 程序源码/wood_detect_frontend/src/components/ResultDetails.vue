@@ -9,9 +9,13 @@
     </header>
 
     <p v-if="result.errorMessage" class="inline-error" role="alert">{{ result.errorMessage }}</p>
+    <p v-if="hasSuspectedAnomaly(result.details)" class="inline-warning" role="status">
+      检测到训练类别之外的明显暗部或空洞，已作为“疑似异常”补充标记。候选强度不是模型置信度，请结合原图人工复核。
+    </p>
 
     <dl class="summary-grid">
       <div><dt>缺陷数量</dt><dd>{{ result.totalCount ?? 0 }}</dd></div>
+      <div><dt>复核候选</dt><dd>{{ reviewCandidateCount(result.details) }}</dd></div>
       <div><dt>请求模式</dt><dd>{{ requestedModeLabel(result.modelMode) }}</dd></div>
       <div><dt>实际模式</dt><dd>{{ actualModeLabel(result.actualMode) }}</dd></div>
       <div><dt>选择依据</dt><dd>{{ decisionReasonLabel(result.decisionReason) }}</dd></div>
@@ -37,11 +41,11 @@
     <div v-if="result.status === 'SUCCESS'" class="detail-table-wrap">
       <table class="detail-table">
         <caption>缺陷明细</caption>
-        <thead><tr><th>类别</th><th>置信度</th><th>坐标范围</th></tr></thead>
+        <thead><tr><th>类别</th><th>置信度 / 候选强度</th><th>坐标范围</th></tr></thead>
         <tbody>
           <tr v-for="(detail, index) in result.details || []" :key="`${detail.className}-${index}`">
             <td><strong>{{ classNameZh(detail.className) }}</strong><small>{{ detail.className }}</small></td>
-            <td>{{ formatConfidence(detail.confidence) }}</td>
+            <td>{{ detailScoreLabel(detail) }}</td>
             <td>{{ detail.x1 }}, {{ detail.y1 }} → {{ detail.x2 }}, {{ detail.y2 }}</td>
           </tr>
           <tr v-if="!(result.details || []).length"><td colspan="3" class="table-empty">未检测到缺陷</td></tr>
@@ -57,10 +61,12 @@ import {
   actualModeLabel,
   classNameZh,
   decisionReasonLabel,
-  formatConfidence,
+  detailScoreLabel,
   formatDuration,
   formatImageSize,
   fullImageUrl,
+  hasSuspectedAnomaly,
+  reviewCandidateCount,
   requestedModeLabel
 } from '../utils/detection'
 
