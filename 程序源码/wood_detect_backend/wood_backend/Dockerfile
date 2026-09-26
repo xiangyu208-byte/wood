@@ -5,7 +5,7 @@ COPY .mvn ./.mvn
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -DskipTests package
+RUN --mount=type=cache,target=/root/.m2 mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-alpine
 

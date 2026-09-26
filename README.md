@@ -156,6 +156,9 @@ GPU 模式默认使用编号为 `0` 的显卡。macOS 不支持 NVIDIA 容器模
 
 ### 一键启停脚本
 
+> 注意：脚本和 `docker-compose.yml` 都在 `程序源码` 目录下，请先 `cd 程序源码` 再执行下面的命令。
+> 也可以在任意目录用绝对路径调用：`D:\wood_detection\wood\程序源码\scripts\start.ps1`（脚本会自动切换到项目根目录）。
+
 Windows PowerShell：
 
 ```powershell

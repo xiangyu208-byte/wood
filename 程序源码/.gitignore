@@ -8,6 +8,8 @@
 **/target/
 **/node_modules/
 **/dist/
+# 数据集目录；注意不要误伤 ultralytics 的 Python 子包 ultralytics/data
 data/
+!ultralytics-main/ultralytics/data/
 uploads/
 *.onnx
