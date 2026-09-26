@@ -100,3 +100,11 @@ export function batchDeleteRecords(ids) {
 export function deleteRecordsByCondition(condition) {
   return request.post('/detect/delete-by-condition', null, { params: condition })
 }
+
+export function submitReview(recordId, review) {
+  return request.put(`/review/${recordId}`, review)
+}
+
+export function getModelVersionStats() {
+  return request.get('/review/model-versions')
+}

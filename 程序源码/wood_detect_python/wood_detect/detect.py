@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from pathlib import Path
 from typing import List, Literal, Mapping, Union
+import hashlib
 import cv2
 import torch
 import os
@@ -43,6 +44,19 @@ RESULT_DIR.mkdir(parents=True, exist_ok=True)
 if not MODEL_PATH.is_file():
     raise RuntimeError(f"模型文件不存在: {MODEL_PATH}")
 
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as model_file:
+        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+MODEL_SHA256 = file_sha256(MODEL_PATH)
+configured_model_version = os.getenv("MODEL_VERSION", "").strip()
+MODEL_VERSION = configured_model_version or f"{MODEL_PATH.stem}-{MODEL_SHA256[:12]}"
+
 model = YOLO(str(MODEL_PATH))
 
 
@@ -77,6 +91,7 @@ class PredictResponse(BaseModel):
     resultImagePath: str
     resultImageUrl: str
     totalCount: int
+    modelVersion: str
     actualMode: str
     decisionReason: str
     inferenceDurationMs: int
@@ -142,6 +157,8 @@ def health():
         "success": True,
         "message": "Python detection service is running",
         "model": MODEL_PATH.name,
+        "modelVersion": MODEL_VERSION,
+        "modelSha256": MODEL_SHA256,
         "device": str(resolve_device()),
         "backend": MODEL_PATH.suffix.lower().lstrip("."),
         "classNames": class_names,
@@ -250,6 +267,7 @@ def predict(req: PredictRequest):
         resultImagePath=str(result_image_path).replace("\\", "/"),
         resultImageUrl=build_result_image_url(result_filename),
         totalCount=sum(item.class_id != SUSPECTED_ANOMALY_CLASS_ID for item in outcome.detections),
+        modelVersion=MODEL_VERSION,
         actualMode=outcome.actual_mode,
         decisionReason=outcome.decision_reason,
         inferenceDurationMs=outcome.duration_ms,

@@ -53,6 +53,20 @@ public class DetectRecord {
 
     private String inferencePrecision;
 
+    private String modelVersion;
+
+    private Double minConfidence;
+
+    private Boolean reviewNeeded;
+
+    private String reviewReason;
+
+    private String reviewStatus;
+
+    private String reviewComment;
+
+    private LocalDateTime reviewedAt;
+
     private Long inferenceDurationMs;
 
     private Integer tileCount;
@@ -60,6 +74,22 @@ public class DetectRecord {
     private Integer imageWidth;
 
     private Integer imageHeight;
+
+    private Double qualityScore;
+
+    private String qualityGrade;
+
+    private Double defectAreaRatio;
+
+    private Double maxDefectAreaRatio;
+
+    private String defectCountsJson;
+
+    private String qualityDeductionsJson;
+
+    private String qualityRuleVersion;
+
+    private String qualityDisclaimer;
 
     private LocalDateTime createTime;
 
