@@ -62,6 +62,9 @@ quality-scoring:
   rule-version: ${QUALITY_RULE_VERSION:WOOD-QS-1.0}
   disclaimer: ${QUALITY_DISCLAIMER:质量分级为本项目内部评价规则，仅用于结果比较和人工复核参考，不属于行业强制标准。}
 
+active-learning:
+  low-confidence-threshold: ${ACTIVE_LEARNING_LOW_CONFIDENCE_THRESHOLD:0.45}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

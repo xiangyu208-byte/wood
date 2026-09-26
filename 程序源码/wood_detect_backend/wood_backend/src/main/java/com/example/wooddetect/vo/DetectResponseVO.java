@@ -69,6 +69,15 @@ public class DetectResponseVO {
     /** 推理精度：AUTO / FP32 / FP16 */
     private String inferencePrecision;
 
+    private String modelVersion;
+    private Double minConfidence;
+    private Boolean reviewNeeded;
+    private String reviewReason;
+    private String reviewStatus;
+    private String reviewComment;
+    private LocalDateTime reviewedAt;
+    private List<ReviewAnnotationVO> reviewAnnotations;
+
     private Long inferenceDurationMs;
 
     private Integer tileCount;

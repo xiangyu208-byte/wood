@@ -57,6 +57,9 @@ public interface DetectService {
             String qualityGrade,
             Double minQualityScore,
             Double maxQualityScore,
+            String modelVersion,
+            String reviewStatus,
+            String reviewQueue,
             String startTime,
             String endTime
     );
@@ -88,6 +91,9 @@ public interface DetectService {
             String qualityGrade,
             Double minQualityScore,
             Double maxQualityScore,
+            String modelVersion,
+            String reviewStatus,
+            String reviewQueue,
             String startTime,
             String endTime
     );
@@ -104,6 +110,9 @@ public interface DetectService {
             String qualityGrade,
             Double minQualityScore,
             Double maxQualityScore,
+            String modelVersion,
+            String reviewStatus,
+            String reviewQueue,
             String startTime,
             String endTime,
             HttpServletResponse response
@@ -121,6 +130,9 @@ public interface DetectService {
             String qualityGrade,
             Double minQualityScore,
             Double maxQualityScore,
+            String modelVersion,
+            String reviewStatus,
+            String reviewQueue,
             String startTime,
             String endTime,
             HttpServletResponse response
@@ -138,6 +150,9 @@ public interface DetectService {
             String qualityGrade,
             Double minQualityScore,
             Double maxQualityScore,
+            String modelVersion,
+            String reviewStatus,
+            String reviewQueue,
             String startTime,
             String endTime,
             HttpServletResponse response

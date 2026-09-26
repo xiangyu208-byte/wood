@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   actualModeLabel,
+  annotationSourceLabel,
   classNameZh,
   decisionReasonLabel,
   detailScoreLabel,
@@ -10,11 +11,15 @@ import {
   formatImageSize,
   formatQualityScore,
   formatRatioPercent,
+  formatMetricChange,
   isTaskActive,
   isTaskTerminal,
   hasSuspectedAnomaly,
+  isReviewPending,
   requestedModeLabel,
   reviewCandidateCount,
+  reviewReasonLabel,
+  reviewStatusMeta,
   qualityGradeLabel,
   statusMeta
 } from './detection.js'
@@ -36,6 +41,16 @@ test('质量评分、等级和面积占比按固定精度展示', () => {
   assert.equal(qualityGradeLabel(''), '未评分')
 })
 
+test('人工复核状态、入队原因和版本指标变化语义明确', () => {
+  assert.equal(reviewStatusMeta('CORRECTED').label, '已人工修正')
+  assert.equal(reviewReasonLabel('LOW_CONFIDENCE'), '存在低置信度检测')
+  assert.equal(annotationSourceLabel('HUMAN_ADDED'), '人工补充')
+  assert.equal(isReviewPending({ reviewNeeded: true, reviewStatus: 'UNREVIEWED' }), true)
+  assert.equal(isReviewPending({ reviewNeeded: true, reviewStatus: 'CORRECT' }), false)
+  assert.equal(formatMetricChange(0.125, '%'), '+0.13%')
+  assert.equal(formatMetricChange(null), '—')
+})
+
 test('任务活动态和终态不会混淆', () => {
   assert.equal(isTaskActive('PENDING'), true)
   assert.equal(isTaskActive('PROCESSING'), true)
@@ -50,6 +65,7 @@ test('缺陷类别和置信度按用户可读格式展示', () => {
   assert.equal(classNameZh('suspected_anomaly'), '疑似异常（需复核）')
   assert.equal(classNameZh('custom_class'), 'custom_class')
   assert.equal(formatConfidence(0.8764), '87.6%')
+  assert.equal(formatConfidence(null), '—')
   assert.equal(formatConfidence(undefined), '—')
   assert.equal(detailScoreLabel({ className: 'suspected_anomaly', confidence: 0.65 }), '候选强度 65.0%')
   assert.equal(hasSuspectedAnomaly([{ className: 'split' }, { className: 'suspected_anomaly' }]), true)

@@ -19,6 +19,7 @@
       </StatePanel>
       <template v-else-if="detailData">
         <ResultDetails :result="detailData" />
+        <ReviewEditor v-if="detailData.status === 'SUCCESS'" :result="detailData" @saved="handleReviewSaved" />
         <div v-if="canRetry" class="retry-row">
           <div><strong>这条记录未成功完成</strong><p>可重新执行当前批次中的失败和已取消项目。</p></div>
           <el-button type="primary" :loading="retrying" @click="handleRetry">重试所在批次</el-button>
@@ -33,6 +34,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ResultDetails from '../components/ResultDetails.vue'
+import ReviewEditor from '../components/ReviewEditor.vue'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { getDetail, retryBatch } from '../api/detect'
@@ -47,6 +49,10 @@ let refreshTimer = null
 
 const errorTone = computed(() => ['offline', 'service'].includes(loadError.value?.kind) ? 'offline' : 'error')
 const canRetry = computed(() => detailData.value?.batchNo && ['FAIL', 'CANCELLED'].includes(detailData.value.status))
+
+function handleReviewSaved(updated) {
+  detailData.value = updated
+}
 
 async function loadDetail(silent = false) {
   if (!silent) loading.value = true

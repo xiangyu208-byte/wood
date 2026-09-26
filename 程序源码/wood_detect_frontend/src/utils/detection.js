@@ -41,6 +41,24 @@ export const DECISION_REASON_LABELS = {
   FIRST_PASS_CONFIDENT: '首轮结果稳定，保留整图推理'
 }
 
+export const REVIEW_STATUS_META = {
+  UNREVIEWED: { label: '未复核', tone: 'neutral' },
+  CORRECT: { label: '结果正确', tone: 'success' },
+  INCORRECT: { label: '结果错误', tone: 'danger' },
+  CORRECTED: { label: '已人工修正', tone: 'warning' }
+}
+
+export const REVIEW_REASON_LABELS = {
+  LOW_CONFIDENCE: '存在低置信度检测',
+  SUSPECTED_ANOMALY: '存在疑似异常复核候选'
+}
+
+export const ANNOTATION_SOURCE_LABELS = {
+  MODEL_CONFIRMED: '模型框已确认',
+  HUMAN_CORRECTED: '人工修正',
+  HUMAN_ADDED: '人工补充'
+}
+
 export function statusMeta(status) {
   return STATUS_META[status] || { label: status || '未知状态', tone: 'neutral' }
 }
@@ -50,6 +68,7 @@ export function classNameZh(className) {
 }
 
 export function formatConfidence(value) {
+  if (value === null || value === undefined || value === '') return '—'
   const number = Number(value)
   return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—'
 }
@@ -104,6 +123,29 @@ export function formatRatioPercent(ratio) {
 
 export function qualityGradeLabel(grade) {
   return grade ? `${grade} 级` : '未评分'
+}
+
+export function reviewStatusMeta(status) {
+  return REVIEW_STATUS_META[status] || { label: status || '未复核', tone: 'neutral' }
+}
+
+export function reviewReasonLabel(reason) {
+  return REVIEW_REASON_LABELS[reason] || reason || '常规抽检'
+}
+
+export function annotationSourceLabel(source) {
+  return ANNOTATION_SOURCE_LABELS[source] || source || '—'
+}
+
+export function isReviewPending(result) {
+  return Boolean(result?.reviewNeeded) && (!result?.reviewStatus || result.reviewStatus === 'UNREVIEWED')
+}
+
+export function formatMetricChange(value, suffix = '') {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  return `${number > 0 ? '+' : ''}${number.toFixed(2)}${suffix}`
 }
 
 export function fullImageUrl(url) {

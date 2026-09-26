@@ -30,6 +30,9 @@ public class PythonDetectResponseDTO {
      */
     private Integer totalCount;
 
+    /** 模型权重版本，默认由文件名和 SHA-256 短哈希组成。 */
+    private String modelVersion;
+
     /** 实际执行模式：FAST_WHOLE / STANDARD_WHOLE / ADAPTIVE_TILED / TILED_ACCURATE */
     private String actualMode;
 

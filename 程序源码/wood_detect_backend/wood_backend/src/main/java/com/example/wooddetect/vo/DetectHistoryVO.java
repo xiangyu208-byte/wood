@@ -26,6 +26,13 @@ public class DetectHistoryVO {
     private String decisionReason;
     private Double confidenceThreshold;
     private String inferencePrecision;
+    private String modelVersion;
+    private Double minConfidence;
+    private Boolean reviewNeeded;
+    private String reviewReason;
+    private String reviewStatus;
+    private String reviewComment;
+    private LocalDateTime reviewedAt;
     private Long inferenceDurationMs;
     private Integer tileCount;
     private Integer imageWidth;

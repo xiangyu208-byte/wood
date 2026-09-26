@@ -41,6 +41,22 @@
         </el-form-item>
         <el-form-item label="最低质量分"><el-input-number v-model="queryForm.minQualityScore" :min="0" :max="100" :precision="0" controls-position="right" placeholder="0" /></el-form-item>
         <el-form-item label="最高质量分"><el-input-number v-model="queryForm.maxQualityScore" :min="0" :max="100" :precision="0" controls-position="right" placeholder="100" /></el-form-item>
+        <el-form-item label="模型版本">
+          <el-select v-model="queryForm.modelVersion" placeholder="全部版本" clearable filterable>
+            <el-option v-for="item in modelVersions" :key="item.modelVersion" :label="item.modelVersion" :value="item.modelVersion" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="人工复核状态">
+          <el-select v-model="queryForm.reviewStatus" placeholder="全部状态" clearable>
+            <el-option label="未复核" value="UNREVIEWED" /><el-option label="结果正确" value="CORRECT" />
+            <el-option label="结果错误" value="INCORRECT" /><el-option label="已人工修正" value="CORRECTED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="自动复核队列">
+          <el-select v-model="queryForm.reviewQueue" placeholder="全部" clearable>
+            <el-option label="待复核" value="YES" /><el-option label="非待复核" value="NO" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="开始时间"><el-date-picker v-model="queryForm.startTime" type="datetime" placeholder="选择开始时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
         <el-form-item label="结束时间"><el-date-picker v-model="queryForm.endTime" type="datetime" placeholder="选择结束时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
         <el-form-item class="filter-submit"><el-button native-type="submit" type="primary">查询记录</el-button></el-form-item>
@@ -54,6 +70,7 @@
           <el-button @click="handleExportCsv">CSV</el-button>
           <el-button @click="handleExportExcel">Excel</el-button>
           <el-button @click="handleDownloadImagesZip">图片 ZIP</el-button>
+          <el-button type="primary" plain @click="handleExportYolo">复核数据 YOLO</el-button>
           <el-button type="danger" plain :disabled="!selectedIds.length" @click="handleBatchDelete">删除选中</el-button>
         </div>
       </div>
@@ -76,6 +93,7 @@
             <el-table-column label="状态" width="126"><template #default="{ row }"><StatusBadge :status="row.status" /></template></el-table-column>
             <el-table-column prop="totalCount" label="缺陷数" width="86" />
             <el-table-column label="质量评价" width="112"><template #default="{ row }"><strong>{{ formatQualityScore(row.qualityScore) }}</strong><small>{{ qualityGradeLabel(row.qualityGrade) }}</small></template></el-table-column>
+            <el-table-column label="人工复核" width="126"><template #default="{ row }"><span class="review-state" :class="`tone-${reviewStatusMeta(row.reviewStatus).tone}`">{{ reviewStatusMeta(row.reviewStatus).label }}</span><small v-if="isReviewPending(row)">自动入队</small></template></el-table-column>
             <el-table-column prop="sourceType" label="来源" width="90"><template #default="{ row }">{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</template></el-table-column>
             <el-table-column label="推理策略" min-width="180"><template #default="{ row }"><span>{{ actualModeLabel(row.actualMode) }} · {{ formatDuration(row.inferenceDurationMs) }}</span></template></el-table-column>
             <el-table-column prop="createTime" label="创建时间" min-width="170" />
@@ -91,7 +109,7 @@
         <ul class="mobile-records" aria-label="历史记录列表">
           <li v-for="row in historyList" :key="row.recordId">
             <div class="mobile-record-head"><strong>{{ row.imageName }}</strong><StatusBadge :status="row.status" /></div>
-            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>质量评价</dt><dd>{{ formatQualityScore(row.qualityScore) }} · {{ qualityGradeLabel(row.qualityGrade) }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
+            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>质量评价</dt><dd>{{ formatQualityScore(row.qualityScore) }} · {{ qualityGradeLabel(row.qualityGrade) }}</dd></div><div><dt>人工复核</dt><dd>{{ reviewStatusMeta(row.reviewStatus).label }}{{ isReviewPending(row) ? ' · 自动入队' : '' }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
             <p v-if="row.errorMessage" class="mobile-error">{{ row.errorMessage }}</p>
             <div class="actions"><el-button type="primary" plain @click="goDetail(row.recordId)">查看详情</el-button><el-button type="danger" text @click="handleDelete(row.recordId)">删除</el-button></div>
           </li>
@@ -107,6 +125,34 @@
         <el-button type="danger" plain @click="handleDeleteByCondition">删除全部筛选结果</el-button>
       </div>
     </section>
+
+    <section class="surface" aria-labelledby="versions-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">人工反馈指标</p><h2 id="versions-title">模型版本对比</h2></div>
+        <el-button text @click="loadModelVersions">刷新指标</el-button>
+      </div>
+      <p class="version-note">确认率为“结果正确 / 已复核”，纠错率为“已人工修正 / 已复核”；变化值与上一模型版本比较。</p>
+      <StatePanel v-if="modelStatsError" tone="error" title="版本指标加载失败" :description="modelStatsError.message">
+        <template #action><el-button type="primary" @click="loadModelVersions">重试</el-button></template>
+      </StatePanel>
+      <div v-else-if="modelVersions.length" class="version-table-wrap">
+        <table class="version-table">
+          <thead><tr><th>模型版本</th><th>记录 / 已复核</th><th>确认率</th><th>纠错率</th><th>平均质量分</th><th>平均耗时</th><th>最后使用</th></tr></thead>
+          <tbody>
+            <tr v-for="item in modelVersions" :key="item.modelVersion">
+              <td><strong>{{ item.modelVersion }}</strong><small>{{ item.reviewNeededCount }} 条自动入队</small></td>
+              <td>{{ item.recordCount }} / {{ item.reviewedCount }}</td>
+              <td>{{ formatRatioPercent(item.confirmationRate) }}<small>{{ formatMetricChange(item.confirmationRateChange == null ? null : item.confirmationRateChange * 100, ' 个百分点') }}</small></td>
+              <td>{{ formatRatioPercent(item.correctionRate) }}<small>{{ formatMetricChange(item.correctionRateChange == null ? null : item.correctionRateChange * 100, ' 个百分点') }}</small></td>
+              <td>{{ formatQualityScore(item.averageQualityScore) }}<small>{{ formatMetricChange(item.averageQualityScoreChange, ' 分') }}</small></td>
+              <td>{{ formatDuration(item.averageInferenceDurationMs) }}</td>
+              <td>{{ item.lastUsedAt || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <StatePanel v-else tone="empty" title="暂无模型版本数据" description="完成识别后，系统会按权重版本聚合人工反馈指标。" />
+    </section>
   </div>
 </template>
 
@@ -116,8 +162,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { batchDeleteRecords, deleteRecord, deleteRecordsByCondition, getHistory } from '../api/detect'
-import { actualModeLabel, formatDuration, formatQualityScore, qualityGradeLabel } from '../utils/detection'
+import { batchDeleteRecords, deleteRecord, deleteRecordsByCondition, getHistory, getModelVersionStats } from '../api/detect'
+import { actualModeLabel, formatDuration, formatMetricChange, formatQualityScore, formatRatioPercent, isReviewPending, qualityGradeLabel, reviewStatusMeta } from '../utils/detection'
 
 const router = useRouter()
 const historyList = ref([])
@@ -128,10 +174,22 @@ const selectedIds = ref([])
 const loading = ref(false)
 const loadError = ref(null)
 const queryForm = ref(emptyQuery())
+const modelVersions = ref([])
+const modelStatsError = ref(null)
 const errorTone = computed(() => ['offline', 'service'].includes(loadError.value?.kind) ? 'offline' : 'error')
 
 function emptyQuery() {
-  return { imageName: '', status: '', batchNo: '', sourceType: '', hasDefect: '', qualityGrade: '', minQualityScore: null, maxQualityScore: null, startTime: '', endTime: '' }
+  return { imageName: '', status: '', batchNo: '', sourceType: '', hasDefect: '', qualityGrade: '', minQualityScore: null, maxQualityScore: null, modelVersion: '', reviewStatus: '', reviewQueue: '', startTime: '', endTime: '' }
+}
+
+async function loadModelVersions() {
+  modelStatsError.value = null
+  try {
+    const payload = await getModelVersionStats()
+    modelVersions.value = payload.data || []
+  } catch (error) {
+    modelStatsError.value = error
+  }
 }
 
 async function loadHistory() {
@@ -195,7 +253,16 @@ function handleExportCsv() { openExport('csv') }
 function handleExportExcel() { openExport('excel') }
 function handleDownloadImagesZip() { openExport('images') }
 
-onMounted(loadHistory)
+function handleExportYolo() {
+  const params = new URLSearchParams()
+  if (selectedIds.value.length) selectedIds.value.forEach(id => params.append('recordIds', String(id)))
+  else if (queryForm.value.reviewStatus && queryForm.value.reviewStatus !== 'UNREVIEWED') params.set('reviewStatus', queryForm.value.reviewStatus)
+  if (queryForm.value.modelVersion) params.set('modelVersion', queryForm.value.modelVersion)
+  const query = params.toString()
+  window.open(`/api/review/export/yolo${query ? `?${query}` : ''}`, '_blank', 'noopener')
+}
+
+onMounted(() => { loadHistory(); loadModelVersions() })
 </script>
 
 <style scoped>
@@ -208,6 +275,17 @@ onMounted(loadHistory)
 .filter-submit :deep(.el-form-item__content), .filter-submit .el-button { width: 100%; }
 .records-heading { align-items: flex-start; }
 .desktop-records small { display: block; margin-top: 3px; color: var(--color-text-muted); }
+.review-state { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.tone-neutral { background: var(--color-surface-muted); color: var(--color-text-muted); }
+.tone-success { background: #dff5e9; color: #176b45; }
+.tone-warning { background: #fff0cf; color: #8a5a12; }
+.tone-danger { background: #fde3e3; color: #9a3030; }
+.version-note { margin: -4px 0 16px; color: var(--color-text-muted); font-size: 12px; }
+.version-table-wrap { overflow-x: auto; }
+.version-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.version-table th, .version-table td { padding: 12px 10px; border-bottom: 1px solid var(--color-border); text-align: left; white-space: nowrap; }
+.version-table th { color: var(--color-text-muted); font-size: 12px; }
+.version-table small { display: block; margin-top: 3px; color: var(--color-text-muted); }
 .file-name { display: block; overflow-wrap: anywhere; }
 .mobile-records { display: none; margin: 0; padding: 0; list-style: none; }
 .pagination-row { display: flex; justify-content: flex-end; margin-top: 20px; overflow-x: auto; }

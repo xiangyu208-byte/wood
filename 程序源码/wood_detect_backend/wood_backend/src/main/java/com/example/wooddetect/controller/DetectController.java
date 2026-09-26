@@ -101,12 +101,16 @@ public class DetectController {
             @RequestParam(required = false) String qualityGrade,
             @RequestParam(required = false) Double minQualityScore,
             @RequestParam(required = false) Double maxQualityScore,
+            @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String reviewQueue,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime
     ) {
         return Result.success(
                 detectService.getHistory(page, size, imageName, status, batchNo, sourceType, hasDefect,
-                        qualityGrade, minQualityScore, maxQualityScore, startTime, endTime)
+                        qualityGrade, minQualityScore, maxQualityScore,
+                        modelVersion, reviewStatus, reviewQueue, startTime, endTime)
         );
     }
 
@@ -149,11 +153,15 @@ public class DetectController {
             @RequestParam(required = false) String qualityGrade,
             @RequestParam(required = false) Double minQualityScore,
             @RequestParam(required = false) Double maxQualityScore,
+            @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String reviewQueue,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime
     ) {
         detectService.deleteRecordsByCondition(imageName, status, batchNo, sourceType, hasDefect,
-                qualityGrade, minQualityScore, maxQualityScore, startTime, endTime);
+                qualityGrade, minQualityScore, maxQualityScore,
+                modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         return Result.success("已按筛选条件删除全部记录");
     }
 
@@ -171,12 +179,16 @@ public class DetectController {
             @RequestParam(required = false) String qualityGrade,
             @RequestParam(required = false) Double minQualityScore,
             @RequestParam(required = false) Double maxQualityScore,
+            @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String reviewQueue,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             HttpServletResponse response
     ) {
         detectService.exportHistoryCsv(imageName, status, batchNo, sourceType, hasDefect,
-                qualityGrade, minQualityScore, maxQualityScore, startTime, endTime, response);
+                qualityGrade, minQualityScore, maxQualityScore,
+                modelVersion, reviewStatus, reviewQueue, startTime, endTime, response);
     }
 
     @GetMapping("/export/excel")
@@ -189,12 +201,16 @@ public class DetectController {
             @RequestParam(required = false) String qualityGrade,
             @RequestParam(required = false) Double minQualityScore,
             @RequestParam(required = false) Double maxQualityScore,
+            @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String reviewQueue,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             HttpServletResponse response
     ) {
         detectService.exportHistoryExcel(imageName, status, batchNo, sourceType, hasDefect,
-                qualityGrade, minQualityScore, maxQualityScore, startTime, endTime, response);
+                qualityGrade, minQualityScore, maxQualityScore,
+                modelVersion, reviewStatus, reviewQueue, startTime, endTime, response);
     }
 
     @PostMapping("/camera-upload")
@@ -218,13 +234,17 @@ public class DetectController {
             @RequestParam(required = false) String qualityGrade,
             @RequestParam(required = false) Double minQualityScore,
             @RequestParam(required = false) Double maxQualityScore,
+            @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String reviewStatus,
+            @RequestParam(required = false) String reviewQueue,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             HttpServletResponse response
     ) {
         detectService.exportHistoryImagesZip(
                 imageName, status, batchNo, sourceType, hasDefect,
-                qualityGrade, minQualityScore, maxQualityScore, startTime, endTime, response
+                qualityGrade, minQualityScore, maxQualityScore,
+                modelVersion, reviewStatus, reviewQueue, startTime, endTime, response
         );
     }
 }
