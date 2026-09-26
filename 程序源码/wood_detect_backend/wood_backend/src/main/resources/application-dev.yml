@@ -10,7 +10,8 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 file:
-  upload-path: ${UPLOAD_PATH:./data/uploads}
+  # 与从 wood_detect_python/wood_detect 启动的推理服务共享程序源码/data/uploads。
+  upload-path: ${UPLOAD_PATH:../../data/uploads}
 
 python:
   predict-url: ${PYTHON_PREDICT_URL:http://127.0.0.1:8001/predict}

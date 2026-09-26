@@ -1,11 +1,16 @@
 dataset:
-  name: wood-defect-6class
-  version: unavailable
-  status: missing-from-repository
-  expected_images: 3836
-  expected_train_images: 3105
-  expected_validation_images: 731
-  source: Roboflow export described by the thesis; exact export ID and archive are unavailable
+  name: wood-defect-12class
+  version: 2026-09-26-v1
+  status: assembled-local-validated
+  path: ../../../datasets/wood_defect_12class
+  images: 5857
+  objects: 16946
+  train_images: 4640
+  validation_images: 930
+  test_images: 287
+  excludes:
+    - marrow
+    - pith_damage
   class_names:
     - dry_knot
     - sound_knot
@@ -13,4 +18,20 @@ dataset:
     - small_knot
     - split
     - wave
-  note: Replace version and source with an immutable dataset release before publishing metrics.
+    - decay
+    - large_hole
+    - insect_damage
+    - mold
+    - bark_loss
+    - stain
+  validation_report: ../../../datasets/wood_defect_12class/metadata/validation_report.json
+  source_manifest: ../../../datasets/wood_defect_12class/metadata/sources.json
+  annotation_manifest: ../../../datasets/wood_defect_12class/metadata/images.jsonl
+  license: mixed-noncommercial-research
+  license_note: >-
+    The assembled dataset includes CC BY-NC 4.0 Oak data and CC BY-NC-SA 4.0
+    MVTec data. Replace those sources before commercial use.
+  quality_note: >-
+    Mold and insect damage remain low-resource classes. The single weak mold
+    image in each evaluation split is only an engineering smoke check and is
+    not sufficient for a production-quality accuracy claim.

@@ -84,6 +84,10 @@ public class ReviewServiceImpl implements ReviewService {
 
         List<ReviewAnnotationDTO> requested = submission.getAnnotations() == null
                 ? List.of() : submission.getAnnotations();
+        if ("CORRECT".equals(reviewStatus) && !requested.isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    "确认结果正确时不能提交修改后的标注框；如需修正，请使用 CORRECTED");
+        }
         if ("CORRECT".equals(reviewStatus) && requested.isEmpty()) {
             requested = originalDetails.stream()
                     .filter(detail -> !"suspected_anomaly".equals(detail.getClassName()))

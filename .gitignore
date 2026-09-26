@@ -16,6 +16,13 @@ Thumbs.db
 /.playwright-cli/
 /output/playwright/
 
+# 数据集源文件与生成图片体积较大，仅保留构建脚本、YAML、清单和验证报告
+/datasets/raw/
+/datasets/datasets/
+/datasets/wood_defect_12class/images/
+/datasets/wood_defect_12class/labels/
+/datasets/metadata/openverse_candidates.json
+
 # 仅供本地参考，不上传到 GitHub
 /参考ppt.pptx
 

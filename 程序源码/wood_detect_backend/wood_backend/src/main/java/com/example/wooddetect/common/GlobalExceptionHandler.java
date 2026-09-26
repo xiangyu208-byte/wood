@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -63,6 +64,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMediaType(HttpMediaTypeNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(Result.fail(415, "不支持的请求类型：" + e.getContentType()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleMissingResource(NoResourceFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.fail(404, "请求的资源不存在"));
     }
 
     @ExceptionHandler(Exception.class)

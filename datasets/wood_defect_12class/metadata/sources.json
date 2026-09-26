@@ -1,0 +1,42 @@
+{
+  "zenodo6": {
+    "url": "https://zenodo.org/records/18205890",
+    "license": "CC BY 4.0",
+    "annotation": "original YOLO boxes"
+  },
+  "vsb": {
+    "url": "https://huggingface.co/datasets/iluvvatar/wood_surface_defects",
+    "license": "CC BY 4.0",
+    "annotation": "original YOLO boxes; marrow, resin and overgrown excluded"
+  },
+  "spruce_bark": {
+    "url": "https://huggingface.co/datasets/jakobkreft/spruce-log-bark-segmentation",
+    "license": "CC BY 4.0",
+    "annotation": "class-2 masks converted to boxes"
+  },
+  "oak_rot": {
+    "url": "https://huggingface.co/datasets/nrodgers98/Oak-Defect-Detection",
+    "license": "CC BY-NC 4.0",
+    "annotation": "BlackRot/YellowRot masks converted to boxes"
+  },
+  "mvtec_hole": {
+    "url": "https://www.mvtec.com/research-teaching/datasets/mvtec-ad",
+    "license": "CC BY-NC-SA 4.0",
+    "annotation": "wood/hole masks converted to insect-hole proxy boxes"
+  },
+  "tree_cavity": {
+    "url": "https://huggingface.co/datasets/neolam2024/Tree-Cavity",
+    "license": "Apache-2.0",
+    "annotation": "visually reviewed weak full-image boxes; train only"
+  },
+  "wikimedia": {
+    "url": "https://commons.wikimedia.org/",
+    "license": "per-image Creative Commons/Public Domain; see images.jsonl",
+    "annotation": "visually reviewed weak full-image boxes; train only"
+  },
+  "openverse": {
+    "url": "https://openverse.org/",
+    "license": "per-image CC0/PDM/CC BY; see images.jsonl",
+    "annotation": "reviewed weak full-image boxes; two mold audit images are reserved for val/test"
+  }
+}

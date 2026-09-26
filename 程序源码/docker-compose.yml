@@ -11,7 +11,7 @@ services:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_change_me}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${DB_PORT:-3306}:3306"
+      - "${DB_BIND_HOST:-127.0.0.1}:${DB_PORT:-3306}:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -35,6 +35,8 @@ services:
       MODEL_VERSION: ${MODEL_VERSION:-}
       CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.25}
       IMAGE_SIZE: ${IMAGE_SIZE:-640}
+      MAX_CONCURRENT_INFERENCES: ${MAX_CONCURRENT_INFERENCES:-1}
+      INFERENCE_ACQUIRE_TIMEOUT_SECONDS: ${INFERENCE_ACQUIRE_TIMEOUT_SECONDS:-5}
       FAST_IMAGE_SIZE: ${FAST_IMAGE_SIZE:-512}
       TILE_IMAGE_SIZE: ${TILE_IMAGE_SIZE:-896}
       TILE_OVERLAP: ${TILE_OVERLAP:-0.20}
@@ -51,7 +53,7 @@ services:
       ANOMALY_MAX_CANDIDATES: ${ANOMALY_MAX_CANDIDATES:-5}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${PYTHON_PORT:-8001}:8001"
+      - "${PYTHON_BIND_HOST:-127.0.0.1}:${PYTHON_PORT:-8001}:8001"
     volumes:
       - uploads:/data/uploads
       - ${ONNX_MODEL_PATH:-./ultralytics-main/runs/detect/best.onnx}:/models/best.onnx:ro
@@ -108,7 +110,7 @@ services:
       ACTIVE_LEARNING_LOW_CONFIDENCE_THRESHOLD: ${ACTIVE_LEARNING_LOW_CONFIDENCE_THRESHOLD:-0.45}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${BACKEND_PORT:-8080}:8080"
     volumes:
       - uploads:/data/uploads
     depends_on:
@@ -129,7 +131,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-8088}:80"
+      - "${FRONTEND_BIND_HOST:-0.0.0.0}:${FRONTEND_PORT:-8088}:80"
     depends_on:
       backend:
         condition: service_healthy

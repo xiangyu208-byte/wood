@@ -17,6 +17,22 @@ EXPECTED_NAMES = (
     "small_knot",
     "split",
     "wave",
+    "decay",
+    "large_hole",
+    "insect_damage",
+    "mold",
+    "bark_loss",
+    "stain",
+)
+
+# NOTE: 向后兼容旧版 6 类模型权重，评估脚本按实际权重类别执行验证
+LEGACY_6CLASS_NAMES = (
+    "dry_knot",
+    "sound_knot",
+    "edge_knot",
+    "small_knot",
+    "split",
+    "wave",
 )
 
 
@@ -44,10 +60,28 @@ def normalized_names(names: Mapping[int | str, str] | list[str] | tuple[str, ...
     return tuple(str(name) for name in ordered)
 
 
-def require_expected_names(names: Mapping[int | str, str] | list[str] | tuple[str, ...], source: str) -> None:
+def require_expected_names(
+    names: Mapping[int | str, str] | list[str] | tuple[str, ...],
+    source: str,
+    allow_legacy: bool = False,
+) -> None:
     actual = normalized_names(names)
-    if actual != EXPECTED_NAMES:
-        raise ValueError(f"{source} 类别不一致。期望 {EXPECTED_NAMES}，实际 {actual}")
+    if actual == EXPECTED_NAMES:
+        return
+    if allow_legacy and actual == LEGACY_6CLASS_NAMES:
+        # NOTE: 旧版 6 类权重，允许通过验证但打印警告
+        import warnings
+        warnings.warn(
+            f"{source} 使用旧版 6 类权重，建议迁移到 12 类模型。",
+            stacklevel=2,
+        )
+        return
+    raise ValueError(
+        f"{source} 类别不一致。\n"
+        f"  期望 12 类: {EXPECTED_NAMES}\n"
+        f"  实际: {actual}"
+    )
+
 
 
 def validate_dataset_yaml(path: str | Path, require_files: bool = True) -> tuple[Path, dict[str, Any]]:

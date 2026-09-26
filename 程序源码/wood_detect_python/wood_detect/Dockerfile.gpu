@@ -13,7 +13,7 @@ COPY ultralytics-main /opt/ultralytics
 COPY wood_detect_python/wood_detect/requirements.txt ./requirements.txt
 RUN pip install /opt/ultralytics -r requirements.txt
 
-COPY wood_detect_python/wood_detect/detect.py wood_detect_python/wood_detect/inference_pipeline.py wood_detect_python/wood_detect/compare_modes.py ./
+COPY wood_detect_python/wood_detect/detect.py wood_detect_python/wood_detect/inference_pipeline.py wood_detect_python/wood_detect/service_runtime.py wood_detect_python/wood_detect/compare_modes.py ./
 
 RUN useradd --create-home --uid 10001 app \
     && mkdir -p /data/uploads/result \

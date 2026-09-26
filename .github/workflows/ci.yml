@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 程序源码/wood_detect_backend/wood_backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: 程序源码/wood_detect_backend/wood_backend/pom.xml
+      - run: chmod +x mvnw
+      - run: ./mvnw -B test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 程序源码/wood_detect_frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: 程序源码/wood_detect_frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  python-and-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: 程序源码/wood_detect_python/wood_detect/requirements.txt
+      - run: python -m pip install numpy opencv-python-headless
+      - run: python -m unittest discover -s wood_detect -p 'test_*.py' -v
+        working-directory: 程序源码/wood_detect_python
+      - run: python -m py_compile wood_detect/detect.py wood_detect/inference_pipeline.py wood_detect/service_runtime.py
+        working-directory: 程序源码/wood_detect_python
+      - run: docker compose config --quiet
+        working-directory: 程序源码

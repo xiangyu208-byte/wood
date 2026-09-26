@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +114,16 @@ class ReviewServiceImplTest {
         submission.setAnnotations(List.of(annotation(null, "split", 0, 0, 1001, 100)));
 
         assertThrows(BusinessException.class, () -> service.submitReview(7L, submission));
+    }
+
+    @Test
+    void rejectsChangedAnnotationsWhenReviewIsMarkedCorrect() {
+        ReviewSubmissionDTO submission = new ReviewSubmissionDTO();
+        submission.setReviewStatus("CORRECT");
+        submission.setAnnotations(List.of(annotation(null, "split", 0, 0, 100, 100)));
+
+        assertThrows(BusinessException.class, () -> service.submitReview(7L, submission));
+        verify(annotationMapper, never()).insert(any(DetectReviewAnnotation.class));
     }
 
     @Test

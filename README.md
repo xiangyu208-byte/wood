@@ -4,7 +4,7 @@ Wood 是一个面向木材表面质量检查场景的全栈缺陷检测系统。
 
 项目采用前后端分离架构，默认提供无需 CUDA 的 CPU 容器方案，同时保留 NVIDIA GPU 推理方案。Windows、Linux 和 macOS 可使用 Docker Compose 部署，手机和平板可作为浏览器客户端访问。
 
-> 当前仓库仍处于持续开发阶段。前七阶段工程内容已完成，包括容器化、后端可靠性、响应式前端、统一模型流水线、自适应高分辨率切片推理、可解释质量评分，以及主动学习与人工复核闭环。原验证集缺失导致的精度复评项仍明确保留为阻塞。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
+> 当前仓库仍处于持续开发阶段。前七阶段工程内容已完成，并已恢复原 6 类数据、构建不含髓心破坏的 12 类扩展数据集。当前部署权重仍为 6 类；12 类重训、独立复评以及霉变/虫蛀同域强标注补充仍待完成。完整进度见[项目实现计划与进度](项目实现计划与进度.md)。
 
 ## 主要功能
 
@@ -202,6 +202,8 @@ cp .env.example .env
 | `BACKEND_PORT` | `8080` | Spring Boot 调试端口 |
 | `PYTHON_PORT` | `8001` | FastAPI 调试端口 |
 | `DB_PORT` | `3306` | MariaDB 对外端口 |
+| `FRONTEND_BIND_HOST` | `0.0.0.0` | 前端监听地址，允许局域网设备访问 |
+| `BACKEND_BIND_HOST` / `PYTHON_BIND_HOST` / `DB_BIND_HOST` | `127.0.0.1` | 内部调试端口仅监听本机；不要无必要暴露到局域网或公网 |
 | `DB_NAME` | `wood_detect` | 数据库名称 |
 | `DB_USERNAME` | `wood` | 数据库业务用户 |
 | `DB_PASSWORD` | `wood_change_me` | 数据库业务用户密码 |
@@ -211,6 +213,8 @@ cp .env.example .env
 | `MODEL_DEVICE` | `0` | GPU 设备编号 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 检测置信度阈值 |
 | `IMAGE_SIZE` | `640` | 模型输入尺寸 |
+| `MAX_CONCURRENT_INFERENCES` | `1` | 每个推理服务进程允许的并发推理数 |
+| `INFERENCE_ACQUIRE_TIMEOUT_SECONDS` | `5` | 等待推理并发槽的最长秒数，超时返回 503 |
 | `TILE_IMAGE_SIZE` | `896` | 精细模式切片尺寸 |
 | `TILE_OVERLAP` | `0.20` | 相邻切片重叠比例 |
 | `NMS_IOU_THRESHOLD` | `0.50` | 跨切片重复框合并阈值 |
@@ -284,6 +288,8 @@ FastAPI 推理服务提供：
 |---|---|---|
 | `POST` | `/predict` | 根据共享卷中的图片路径执行推理 |
 | `GET` | `/health` | 推理服务健康检查 |
+
+`/predict` 只接受 `UPLOAD_ROOT` 内的真实文件路径，会拒绝路径穿越和符号链接逃逸；校验失败、服务繁忙和内部错误均返回统一的 `success/code/message` JSON。默认 Compose 只把推理、后端和数据库调试端口绑定到 `127.0.0.1`，移动设备应通过前端统一入口访问。
 
 ## 数据与模型持久化
 
@@ -364,6 +370,7 @@ Vite 开发服务器会把 `/api` 和 `/static` 代理到 `VITE_DEV_BACKEND_URL`
 cd 程序源码\wood_detect_backend\wood_backend
 $env:DB_USERNAME='wood'
 $env:DB_PASSWORD='your_password'
+$env:UPLOAD_PATH='..\..\data\uploads'
 .\mvnw.cmd test
 .\mvnw.cmd spring-boot:run
 ```
@@ -380,11 +387,21 @@ Linux/macOS 对应使用 `./mvnw`。配置分为：
 ```powershell
 cd 程序源码\wood_detect_python\wood_detect
 $env:MODEL_PATH='..\..\ultralytics-main\runs\detect\best.pt'
-$env:UPLOAD_ROOT='.\data\uploads'
+$env:UPLOAD_ROOT='..\..\data\uploads'
 python detect.py
 ```
 
-默认端口为 `8001`，设备配置为 `auto` 时会优先使用可用的 CUDA，否则回退到 CPU。
+默认端口为 `8001`，设备配置为 `auto` 时会优先使用可用的 CUDA，否则回退到 CPU。后端的 `UPLOAD_PATH` 与推理服务的 `UPLOAD_ROOT` 必须解析到同一目录；按上述两个子项目目录启动时，默认都会指向 `程序源码/data/uploads`。
+
+### 自动化检查与容器冒烟测试
+
+```powershell
+cd 程序源码
+python -m unittest discover -s wood_detect_python\wood_detect -p "test_*.py" -v
+python .\scripts\smoke_test.py
+```
+
+冒烟脚本会检查前端、后端/数据库、推理服务、推理路径边界和静态资源 404 语义。GitHub Actions 还会自动运行后端测试、前端测试与构建、Python 测试、依赖漏洞检查和 Compose 配置校验。
 
 ## 当前开发进度
 
@@ -410,6 +427,7 @@ python detect.py
 - 快速整图、自适应切片和精细切片推理，以及坐标还原、按类别 NMS 和疑似异常复核候选。
 - 可解释质量评分、A/B/C/D 等级、扣分原因、历史筛选及 CSV/Excel 评价字段。
 - 主动学习复核队列、人工框修正、YOLO 数据回流、模型哈希版本和版本指标对比。
+- 推理并发保护、上传目录边界校验、统一错误响应、Docker 冒烟脚本和 GitHub Actions 持续集成。
 
 后续重点：
 

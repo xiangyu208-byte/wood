@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from ultralytics import YOLO
 from pathlib import Path
@@ -7,6 +9,7 @@ import hashlib
 import cv2
 import torch
 import os
+import logging
 
 from inference_pipeline import (
     AUTO_CONFIDENCE_THRESHOLD,
@@ -20,6 +23,9 @@ from inference_pipeline import (
     Detection,
     run_inference,
 )
+from service_runtime import InferenceBusyError, InferenceGate, InputImageError, resolve_input_image
+
+logger = logging.getLogger("wood-detect-inference")
 
 # =========================
 # 1. FastAPI 应用
@@ -28,11 +34,13 @@ app = FastAPI(title="Wood Defect Detection Service")
 # =========================
 # 2. 配置区域（Docker 和本地开发均通过环境变量覆盖）
 MODEL_PATH = Path(os.getenv("MODEL_PATH", "../../ultralytics-main/runs/detect/best.pt")).expanduser().resolve()
-UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", "./data/uploads")).expanduser().resolve()
+UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", "../../data/uploads")).expanduser().resolve()
 ACCESS_URL_PREFIX = os.getenv("ACCESS_URL_PREFIX", "/static/")
 MODEL_DEVICE = os.getenv("MODEL_DEVICE", "auto").strip().lower()
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.25"))
 IMAGE_SIZE = int(os.getenv("IMAGE_SIZE", "640"))
+MAX_CONCURRENT_INFERENCES = int(os.getenv("MAX_CONCURRENT_INFERENCES", "1"))
+INFERENCE_ACQUIRE_TIMEOUT_SECONDS = float(os.getenv("INFERENCE_ACQUIRE_TIMEOUT_SECONDS", "5"))
 
 # 结果图保存目录
 RESULT_DIR = UPLOAD_ROOT / "result"
@@ -58,6 +66,7 @@ configured_model_version = os.getenv("MODEL_VERSION", "").strip()
 MODEL_VERSION = configured_model_version or f"{MODEL_PATH.stem}-{MODEL_SHA256[:12]}"
 
 model = YOLO(str(MODEL_PATH))
+inference_gate = InferenceGate(MAX_CONCURRENT_INFERENCES, INFERENCE_ACQUIRE_TIMEOUT_SECONDS)
 
 
 def normalize_model_names(names: Mapping[int | str, str] | List[str]) -> dict[int, str]:
@@ -99,6 +108,44 @@ class PredictResponse(BaseModel):
     imageWidth: int
     imageHeight: int
     details: List[DetectItem]
+
+
+def error_payload(code: str, message: str) -> dict[str, object]:
+    return {"success": False, "code": code, "message": message}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_: Request, exc: RequestValidationError):
+    field_candidates = {
+        ".".join(part for part in error["loc"] if isinstance(part, str) and part != "body")
+        for error in exc.errors()
+    }
+    fields = sorted(field for field in field_candidates if field)
+    suffix = f"：{', '.join(fields)}" if fields else ""
+    return JSONResponse(status_code=422, content=error_payload("VALIDATION_ERROR", f"请求参数校验失败{suffix}"))
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException):
+    if exc.status_code == 503:
+        code = "INFERENCE_BUSY"
+    elif exc.status_code == 404:
+        code = "NOT_FOUND"
+    elif exc.status_code < 500:
+        code = "BAD_REQUEST"
+    else:
+        code = "INFERENCE_ERROR"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_payload(code, str(exc.detail)),
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception):
+    logger.exception("未处理的推理服务异常", exc_info=exc)
+    return JSONResponse(status_code=500, content=error_payload("INTERNAL_ERROR", "推理服务内部错误"))
 
 
 # =========================
@@ -162,6 +209,10 @@ def health():
         "device": str(resolve_device()),
         "backend": MODEL_PATH.suffix.lower().lstrip("."),
         "classNames": class_names,
+        "concurrency": {
+            "maxConcurrentInferences": MAX_CONCURRENT_INFERENCES,
+            "acquireTimeoutSeconds": INFERENCE_ACQUIRE_TIMEOUT_SECONDS,
+        },
         "adaptiveInference": {
             "tileSize": TILE_IMAGE_SIZE,
             "tileOverlap": TILE_OVERLAP,
@@ -178,16 +229,24 @@ def health():
 # =========================
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
-    image_path = Path(req.imagePath)
+    try:
+        image_path = resolve_input_image(req.imagePath, UPLOAD_ROOT)
+    except InputImageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # 1. 检查图片是否存在
-    if not image_path.is_file():
-        raise HTTPException(status_code=400, detail=f"图片不存在: {req.imagePath}")
+    try:
+        with inference_gate.slot():
+            return run_prediction(req, image_path)
+    except InferenceBusyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def run_prediction(req: PredictRequest, image_path: Path) -> PredictResponse:
 
     # 2. 读取图片
     image = cv2.imread(str(image_path))
     if image is None:
-        raise HTTPException(status_code=400, detail=f"图片读取失败: {req.imagePath}")
+        raise HTTPException(status_code=400, detail="图片读取失败或格式不受支持")
 
     # 3. YOLO 推理。STANDARD 可根据分辨率或首轮结果自动升级到重叠切片。
     try:
@@ -228,8 +287,9 @@ def predict(req: PredictRequest):
         outcome = run_inference(image, req.modelMode, predict_region, IMAGE_SIZE)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"模型推理失败: {str(e)}")
+    except Exception as exc:
+        logger.exception("模型推理失败, image=%s", image_path.name)
+        raise HTTPException(status_code=500, detail="模型推理失败") from exc
 
     class_names = {
         **normalize_model_names(model.names),

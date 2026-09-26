@@ -1,0 +1,127 @@
+{
+  "ok": true,
+  "issues": [],
+  "images_total": 5865,
+  "objects_total": 16954,
+  "images_by_split": {
+    "train": 4648,
+    "val": 930,
+    "test": 287
+  },
+  "images_by_source": {
+    "zenodo6": 3773,
+    "vsb": 1374,
+    "spruce_bark": 578,
+    "oak_rot": 79,
+    "mvtec_hole": 10,
+    "openverse": 21,
+    "tree_cavity": 22,
+    "wikimedia": 8
+  },
+  "images_by_class_and_split": {
+    "train": {
+      "0": 1549,
+      "1": 1433,
+      "2": 363,
+      "3": 982,
+      "4": 792,
+      "5": 1292,
+      "6": 62,
+      "7": 389,
+      "8": 25,
+      "9": 6,
+      "10": 450,
+      "11": 641
+    },
+    "val": {
+      "0": 320,
+      "1": 278,
+      "2": 90,
+      "3": 199,
+      "4": 163,
+      "5": 292,
+      "6": 9,
+      "7": 71,
+      "8": 2,
+      "9": 1,
+      "10": 63,
+      "11": 111
+    },
+    "test": {
+      "0": 97,
+      "1": 96,
+      "2": 0,
+      "3": 0,
+      "4": 25,
+      "5": 0,
+      "6": 11,
+      "7": 40,
+      "8": 1,
+      "9": 1,
+      "10": 65,
+      "11": 171
+    }
+  },
+  "class_stats": {
+    "0": {
+      "name": "dry_knot",
+      "images": 1966,
+      "objects": 2562
+    },
+    "1": {
+      "name": "sound_knot",
+      "images": 1807,
+      "objects": 2598
+    },
+    "2": {
+      "name": "edge_knot",
+      "images": 453,
+      "objects": 497
+    },
+    "3": {
+      "name": "small_knot",
+      "images": 1181,
+      "objects": 1934
+    },
+    "4": {
+      "name": "split",
+      "images": 980,
+      "objects": 1594
+    },
+    "5": {
+      "name": "wave",
+      "images": 1584,
+      "objects": 2199
+    },
+    "6": {
+      "name": "decay",
+      "images": 82,
+      "objects": 226
+    },
+    "7": {
+      "name": "large_hole",
+      "images": 500,
+      "objects": 525
+    },
+    "8": {
+      "name": "insect_damage",
+      "images": 28,
+      "objects": 50
+    },
+    "9": {
+      "name": "mold",
+      "images": 8,
+      "objects": 8
+    },
+    "10": {
+      "name": "bark_loss",
+      "images": 578,
+      "objects": 3590
+    },
+    "11": {
+      "name": "stain",
+      "images": 923,
+      "objects": 1171
+    }
+  }
+}

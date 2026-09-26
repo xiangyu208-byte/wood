@@ -1,0 +1,38 @@
+# 12 类木材缺陷检测模型训练配置
+# 在原 train.yaml 基础上调整，适配新增 6 类缺陷（不含髓心破坏）
+model: configs/yolov8s-c2fpsa-12class.yaml
+data: yolo-bvn-12class.yaml
+epochs: 300
+batch: 16
+imgsz: 896
+device: auto
+workers: 8
+optimizer: AdamW
+lr0: 0.001
+lrf: 0.01
+weight_decay: 0.0005
+warmup_epochs: 5.0
+box: 7.5
+cls: 0.5
+dfl: 1.5
+patience: 30
+pretrained: true
+val: true
+plots: true
+save: true
+save_period: -1
+seed: 0
+deterministic: true
+cos_lr: true
+close_mosaic: 15
+# 颜色增强加强：对 mold/stain/decay 等颜色类缺陷更有效
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.3
+degrees: 2.0
+translate: 0.05
+scale: 0.2
+mosaic: 0.4
+project: runs/detect
+name: wood-yolov8s-c2fpsa-12class
+exist_ok: false

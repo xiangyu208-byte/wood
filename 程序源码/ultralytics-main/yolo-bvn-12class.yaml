@@ -1,0 +1,30 @@
+# 木材表面缺陷检测数据集（扩展 12 类，不含髓心破坏）
+#
+# 目录结构：
+# datasets/wood_defect_12class/
+#   images/train  labels/train
+#   images/val    labels/val
+#   images/test   labels/test  （可选）
+#
+# 训练数据来源：
+#   - 原 6 类：Zenodo WoodDefect Detection Dataset
+#   - 新 6 类：VSB-TUO、Oak rot、spruce bark、MVTec hole 和审查后的开放图片
+#
+path: ../../datasets/wood_defect_12class
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: dry_knot        # 干节（原有）
+  1: sound_knot      # 健全节（原有）
+  2: edge_knot       # 边节（原有）
+  3: small_knot      # 小节（原有）
+  4: split           # 裂纹（原有）
+  5: wave            # 波纹（原有）
+  6: decay           # 腐朽/腐烂（新增）
+  7: large_hole      # 大型空洞/树洞（新增）
+  8: insect_damage   # 虫蛀/虫孔（新增）
+  9: mold            # 霉变（新增）
+  10: bark_loss      # 树皮脱落（新增）
+  11: stain          # 颜色异常/污渍（新增）

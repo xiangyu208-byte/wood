@@ -86,6 +86,8 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `BACKEND_PORT` | `8080` | 后端调试端口 |
 | `PYTHON_PORT` | `8001` | 推理服务调试端口 |
 | `DB_PORT` | `3306` | 数据库宿主机端口 |
+| `FRONTEND_BIND_HOST` | `0.0.0.0` | 前端监听地址，允许局域网访问 |
+| `BACKEND_BIND_HOST` / `PYTHON_BIND_HOST` / `DB_BIND_HOST` | `127.0.0.1` | 内部调试端口默认只监听本机 |
 | `DB_NAME` | `wood_detect` | 数据库名 |
 | `DB_USERNAME` | `wood` | 业务数据库用户 |
 | `DB_PASSWORD` | `wood_change_me` | 业务数据库密码 |
@@ -95,6 +97,8 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `MODEL_DEVICE` | `0` | GPU 编号，仅 GPU 覆盖配置使用 |
 | `CONFIDENCE_THRESHOLD` | `0.25` | 推理置信度阈值 |
 | `IMAGE_SIZE` | `640` | 推理输入尺寸 |
+| `MAX_CONCURRENT_INFERENCES` | `1` | 单进程并发推理上限 |
+| `INFERENCE_ACQUIRE_TIMEOUT_SECONDS` | `5` | 等待推理槽超时，超时返回 503 |
 | `TILE_IMAGE_SIZE` | `896` | 精细模式切片尺寸 |
 | `TILE_OVERLAP` | `0.20` | 切片重叠比例 |
 | `NMS_IOU_THRESHOLD` | `0.50` | 跨切片按类别 NMS 阈值 |
@@ -115,6 +119,7 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `ACTIVE_LEARNING_LOW_CONFIDENCE_THRESHOLD` | `0.45` | 自动进入人工复核队列的置信度阈值 |
 
 正式部署前必须修改数据库密码。若端口被占用，只需修改 `.env` 中相应端口。
+推理接口仅允许读取 `UPLOAD_ROOT` 内的真实文件，并统一返回结构化错误；如无调试需要，请保持后端、推理和数据库端口绑定在 `127.0.0.1`。
 
 ## 服务入口与健康检查
 
@@ -217,6 +222,7 @@ docker compose down
 cd wood_detect_backend\wood_backend
 $env:DB_USERNAME='wood'
 $env:DB_PASSWORD='your_password'
+$env:UPLOAD_PATH='..\..\data\uploads'
 .\mvnw.cmd test
 .\mvnw.cmd spring-boot:run
 ```
@@ -241,9 +247,20 @@ npm run dev
 
 ```powershell
 $env:MODEL_PATH='..\..\ultralytics-main\runs\detect\best.onnx'
-$env:UPLOAD_ROOT='.\data\uploads'
+$env:UPLOAD_ROOT='..\..\data\uploads'
 python detect.py
 ```
+
+从上述两个子项目目录启动时，`UPLOAD_PATH` 和 `UPLOAD_ROOT` 必须指向同一个共享目录；默认均为 `程序源码/data/uploads`。
+
+运行全部 Python 单元测试与已启动 Compose 环境的冒烟测试：
+
+```powershell
+python -m unittest discover -s wood_detect_python\wood_detect -p "test_*.py" -v
+python .\scripts\smoke_test.py
+```
+
+GitHub Actions 会在推送和拉取请求时运行后端测试、前端测试/构建、Python 测试、前端生产依赖漏洞检查以及 Compose 配置校验。
 
 ## 常见问题
 

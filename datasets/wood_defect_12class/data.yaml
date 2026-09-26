@@ -1,0 +1,18 @@
+path: E:/wood/datasets/wood_defect_12class
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: dry_knot
+  1: sound_knot
+  2: edge_knot
+  3: small_knot
+  4: split
+  5: wave
+  6: decay
+  7: large_hole
+  8: insect_damage
+  9: mold
+  10: bark_loss
+  11: stain
