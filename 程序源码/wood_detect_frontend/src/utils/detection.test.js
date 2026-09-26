@@ -8,11 +8,14 @@ import {
   formatConfidence,
   formatDuration,
   formatImageSize,
+  formatQualityScore,
+  formatRatioPercent,
   isTaskActive,
   isTaskTerminal,
   hasSuspectedAnomaly,
   requestedModeLabel,
   reviewCandidateCount,
+  qualityGradeLabel,
   statusMeta
 } from './detection.js'
 
@@ -21,6 +24,16 @@ test('业务状态映射为明确的中文语义', () => {
   assert.equal(statusMeta('FAIL').label, '识别失败')
   assert.equal(statusMeta('PROCESSING').tone, 'warning')
   assert.equal(statusMeta('CANCELLED').label, '已取消')
+})
+
+test('质量评分、等级和面积占比按固定精度展示', () => {
+  assert.equal(formatQualityScore(86.5), '86.50')
+  assert.equal(formatQualityScore(null), '—')
+  assert.equal(formatQualityScore(undefined), '—')
+  assert.equal(formatRatioPercent(0.12654), '12.65%')
+  assert.equal(formatRatioPercent(undefined), '—')
+  assert.equal(qualityGradeLabel('B'), 'B 级')
+  assert.equal(qualityGradeLabel(''), '未评分')
 })
 
 test('任务活动态和终态不会混淆', () => {

@@ -54,6 +54,9 @@ public interface DetectService {
             String batchNo,
             String sourceType,
             String hasDefect,
+            String qualityGrade,
+            Double minQualityScore,
+            Double maxQualityScore,
             String startTime,
             String endTime
     );
@@ -82,6 +85,9 @@ public interface DetectService {
             String batchNo,
             String sourceType,
             String hasDefect,
+            String qualityGrade,
+            Double minQualityScore,
+            Double maxQualityScore,
             String startTime,
             String endTime
     );
@@ -95,6 +101,9 @@ public interface DetectService {
             String batchNo,
             String sourceType,
             String hasDefect,
+            String qualityGrade,
+            Double minQualityScore,
+            Double maxQualityScore,
             String startTime,
             String endTime,
             HttpServletResponse response
@@ -109,6 +118,9 @@ public interface DetectService {
             String batchNo,
             String sourceType,
             String hasDefect,
+            String qualityGrade,
+            Double minQualityScore,
+            Double maxQualityScore,
             String startTime,
             String endTime,
             HttpServletResponse response
@@ -123,6 +135,9 @@ public interface DetectService {
             String batchNo,
             String sourceType,
             String hasDefect,
+            String qualityGrade,
+            Double minQualityScore,
+            Double maxQualityScore,
             String startTime,
             String endTime,
             HttpServletResponse response

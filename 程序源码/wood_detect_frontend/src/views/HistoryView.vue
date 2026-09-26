@@ -34,6 +34,13 @@
             <el-option label="有缺陷" value="YES" /><el-option label="无缺陷" value="NO" />
           </el-select>
         </el-form-item>
+        <el-form-item label="质量等级">
+          <el-select v-model="queryForm.qualityGrade" placeholder="全部等级" clearable>
+            <el-option v-for="grade in ['A', 'B', 'C', 'D']" :key="grade" :label="`${grade} 级`" :value="grade" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="最低质量分"><el-input-number v-model="queryForm.minQualityScore" :min="0" :max="100" :precision="0" controls-position="right" placeholder="0" /></el-form-item>
+        <el-form-item label="最高质量分"><el-input-number v-model="queryForm.maxQualityScore" :min="0" :max="100" :precision="0" controls-position="right" placeholder="100" /></el-form-item>
         <el-form-item label="开始时间"><el-date-picker v-model="queryForm.startTime" type="datetime" placeholder="选择开始时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
         <el-form-item label="结束时间"><el-date-picker v-model="queryForm.endTime" type="datetime" placeholder="选择结束时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
         <el-form-item class="filter-submit"><el-button native-type="submit" type="primary">查询记录</el-button></el-form-item>
@@ -68,6 +75,7 @@
             </el-table-column>
             <el-table-column label="状态" width="126"><template #default="{ row }"><StatusBadge :status="row.status" /></template></el-table-column>
             <el-table-column prop="totalCount" label="缺陷数" width="86" />
+            <el-table-column label="质量评价" width="112"><template #default="{ row }"><strong>{{ formatQualityScore(row.qualityScore) }}</strong><small>{{ qualityGradeLabel(row.qualityGrade) }}</small></template></el-table-column>
             <el-table-column prop="sourceType" label="来源" width="90"><template #default="{ row }">{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</template></el-table-column>
             <el-table-column label="推理策略" min-width="180"><template #default="{ row }"><span>{{ actualModeLabel(row.actualMode) }} · {{ formatDuration(row.inferenceDurationMs) }}</span></template></el-table-column>
             <el-table-column prop="createTime" label="创建时间" min-width="170" />
@@ -83,7 +91,7 @@
         <ul class="mobile-records" aria-label="历史记录列表">
           <li v-for="row in historyList" :key="row.recordId">
             <div class="mobile-record-head"><strong>{{ row.imageName }}</strong><StatusBadge :status="row.status" /></div>
-            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
+            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>质量评价</dt><dd>{{ formatQualityScore(row.qualityScore) }} · {{ qualityGradeLabel(row.qualityGrade) }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
             <p v-if="row.errorMessage" class="mobile-error">{{ row.errorMessage }}</p>
             <div class="actions"><el-button type="primary" plain @click="goDetail(row.recordId)">查看详情</el-button><el-button type="danger" text @click="handleDelete(row.recordId)">删除</el-button></div>
           </li>
@@ -109,7 +117,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { batchDeleteRecords, deleteRecord, deleteRecordsByCondition, getHistory } from '../api/detect'
-import { actualModeLabel, formatDuration } from '../utils/detection'
+import { actualModeLabel, formatDuration, formatQualityScore, qualityGradeLabel } from '../utils/detection'
 
 const router = useRouter()
 const historyList = ref([])
@@ -123,7 +131,7 @@ const queryForm = ref(emptyQuery())
 const errorTone = computed(() => ['offline', 'service'].includes(loadError.value?.kind) ? 'offline' : 'error')
 
 function emptyQuery() {
-  return { imageName: '', status: '', batchNo: '', sourceType: '', hasDefect: '', startTime: '', endTime: '' }
+  return { imageName: '', status: '', batchNo: '', sourceType: '', hasDefect: '', qualityGrade: '', minQualityScore: null, maxQualityScore: null, startTime: '', endTime: '' }
 }
 
 async function loadHistory() {
@@ -172,7 +180,9 @@ function handleDeleteByCondition() {
 
 function buildExportParams() {
   const params = new URLSearchParams()
-  Object.entries(queryForm.value).forEach(([key, value]) => { if (value) params.append(key, value) })
+  Object.entries(queryForm.value).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') params.append(key, String(value))
+  })
   return params.toString()
 }
 
@@ -193,6 +203,7 @@ onMounted(loadHistory)
 .filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 16px; }
 .filter-grid :deep(.el-form-item) { margin-bottom: 14px; }
 .filter-grid :deep(.el-select), .filter-grid :deep(.el-date-editor) { width: 100%; }
+.filter-grid :deep(.el-input-number) { width: 100%; }
 .filter-submit { align-self: end; }
 .filter-submit :deep(.el-form-item__content), .filter-submit .el-button { width: 100%; }
 .records-heading { align-items: flex-start; }

@@ -90,6 +90,22 @@ export function formatImageSize(width, height) {
   return width && height ? `${width} × ${height}` : '—'
 }
 
+export function formatQualityScore(score) {
+  if (score === null || score === undefined || score === '') return '—'
+  const value = Number(score)
+  return Number.isFinite(value) ? value.toFixed(2) : '—'
+}
+
+export function formatRatioPercent(ratio) {
+  if (ratio === null || ratio === undefined || ratio === '') return '—'
+  const value = Number(ratio)
+  return Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '—'
+}
+
+export function qualityGradeLabel(grade) {
+  return grade ? `${grade} 级` : '未评分'
+}
+
 export function fullImageUrl(url) {
   if (!url) return ''
   return new URL(url, window.location.origin).toString()

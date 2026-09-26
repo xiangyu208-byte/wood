@@ -61,6 +61,22 @@ public class DetectRecord {
 
     private Integer imageHeight;
 
+    private Double qualityScore;
+
+    private String qualityGrade;
+
+    private Double defectAreaRatio;
+
+    private Double maxDefectAreaRatio;
+
+    private String defectCountsJson;
+
+    private String qualityDeductionsJson;
+
+    private String qualityRuleVersion;
+
+    private String qualityDisclaimer;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

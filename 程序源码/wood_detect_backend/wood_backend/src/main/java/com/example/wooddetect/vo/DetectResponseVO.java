@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class DetectResponseVO {
@@ -75,6 +76,16 @@ public class DetectResponseVO {
     private Integer imageWidth;
 
     private Integer imageHeight;
+
+    /** 项目内部质量评价快照。 */
+    private Double qualityScore;
+    private String qualityGrade;
+    private Double defectAreaRatio;
+    private Double maxDefectAreaRatio;
+    private Map<String, Integer> defectCounts;
+    private List<QualityDeductionVO> qualityDeductions;
+    private String qualityRuleVersion;
+    private String qualityDisclaimer;
 
     /**
      * 识别时间

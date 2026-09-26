@@ -40,6 +40,28 @@ python:
   max-attempts: ${PYTHON_MAX_ATTEMPTS:2}
   retry-delay: ${PYTHON_RETRY_DELAY:500ms}
 
+# 项目内部质量评价规则。各类别按检测数量扣分，面积按图片占比扣分。
+quality-scoring:
+  base-score: ${QUALITY_BASE_SCORE:100}
+  category-weights:
+    split: ${QUALITY_WEIGHT_SPLIT:8}
+    dry_knot: ${QUALITY_WEIGHT_DRY_KNOT:6}
+    edge_knot: ${QUALITY_WEIGHT_EDGE_KNOT:5}
+    wave: ${QUALITY_WEIGHT_WAVE:3}
+    sound_knot: ${QUALITY_WEIGHT_SOUND_KNOT:2.5}
+    small_knot: ${QUALITY_WEIGHT_SMALL_KNOT:2}
+    suspected_anomaly: ${QUALITY_WEIGHT_SUSPECTED_ANOMALY:2}
+  unknown-category-weight: ${QUALITY_WEIGHT_UNKNOWN:3}
+  area-penalty-per-percent: ${QUALITY_AREA_PENALTY_PER_PERCENT:0.35}
+  max-area-penalty-per-percent: ${QUALITY_MAX_AREA_PENALTY_PER_PERCENT:0.25}
+  total-area-penalty-cap: ${QUALITY_TOTAL_AREA_PENALTY_CAP:35}
+  max-area-penalty-cap: ${QUALITY_MAX_AREA_PENALTY_CAP:20}
+  grade-a-min: ${QUALITY_GRADE_A_MIN:90}
+  grade-b-min: ${QUALITY_GRADE_B_MIN:75}
+  grade-c-min: ${QUALITY_GRADE_C_MIN:60}
+  rule-version: ${QUALITY_RULE_VERSION:WOOD-QS-1.0}
+  disclaimer: ${QUALITY_DISCLAIMER:质量分级为本项目内部评价规则，仅用于结果比较和人工复核参考，不属于行业强制标准。}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

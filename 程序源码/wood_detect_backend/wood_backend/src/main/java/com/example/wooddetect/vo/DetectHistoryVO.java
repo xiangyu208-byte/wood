@@ -30,6 +30,11 @@ public class DetectHistoryVO {
     private Integer tileCount;
     private Integer imageWidth;
     private Integer imageHeight;
+    private Double qualityScore;
+    private String qualityGrade;
+    private Double defectAreaRatio;
+    private Double maxDefectAreaRatio;
+    private String qualityRuleVersion;
 
     /**
      * 原始文件名
