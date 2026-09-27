@@ -11,6 +11,10 @@ import numpy as np
 
 FAST_IMAGE_SIZE = int(os.getenv("FAST_IMAGE_SIZE", "512"))
 TILE_IMAGE_SIZE = int(os.getenv("TILE_IMAGE_SIZE", "896"))
+TILE_WINDOW_SIZE = int(os.getenv("TILE_WINDOW_SIZE", "640"))
+MAX_TILE_COUNT = int(os.getenv("MAX_TILE_COUNT", "24"))
+ENHANCED_REVIEW_ENABLED = os.getenv("ENHANCED_REVIEW_ENABLED", "true").lower() == "true"
+CRACK_TRACE_ENABLED = os.getenv("CRACK_TRACE_ENABLED", "true").lower() == "true"
 TILE_OVERLAP = float(os.getenv("TILE_OVERLAP", "0.20"))
 NMS_IOU_THRESHOLD = float(os.getenv("NMS_IOU_THRESHOLD", "0.50"))
 AUTO_MAX_DIMENSION = int(os.getenv("AUTO_MAX_DIMENSION", "2560"))
@@ -23,10 +27,12 @@ ANOMALY_MIN_WOOD_RATIO = float(os.getenv("ANOMALY_MIN_WOOD_RATIO", "0.30"))
 ANOMALY_MIN_COMPONENT_RATIO = float(os.getenv("ANOMALY_MIN_COMPONENT_RATIO", "0.001"))
 ANOMALY_MAX_COMPONENT_RATIO = float(os.getenv("ANOMALY_MAX_COMPONENT_RATIO", "0.15"))
 ANOMALY_MAX_CANDIDATES = int(os.getenv("ANOMALY_MAX_CANDIDATES", "5"))
-SUSPECTED_ANOMALY_CLASS_ID = 6
-SUSPECTED_ANOMALY_CLASS_NAME = "suspected_anomaly"
+MODEL_CLASS_NAMES = (
+    "dry_knot", "sound_knot", "edge_knot", "small_knot", "split", "wave",
+    "decay", "large_hole", "bark_pocket", "stain",
+)
 
-if FAST_IMAGE_SIZE < 32 or TILE_IMAGE_SIZE < 32:
+if FAST_IMAGE_SIZE < 32 or TILE_IMAGE_SIZE < 32 or TILE_WINDOW_SIZE < 128:
     raise ValueError("推理尺寸必须至少为 32")
 if not 0 <= TILE_OVERLAP < 1:
     raise ValueError("TILE_OVERLAP 必须在 [0, 1) 范围内")
@@ -40,6 +46,8 @@ if not 0 < ANOMALY_MIN_COMPONENT_RATIO < ANOMALY_MAX_COMPONENT_RATIO < 1:
     raise ValueError("异常候选面积比例配置无效")
 if ANOMALY_MAX_CANDIDATES < 1:
     raise ValueError("ANOMALY_MAX_CANDIDATES 必须大于 0")
+if MAX_TILE_COUNT < 4:
+    raise ValueError("MAX_TILE_COUNT 必须至少为 4")
 
 
 @dataclass(frozen=True)
@@ -161,14 +169,14 @@ def wood_tone_ratio(image: np.ndarray) -> float:
     return float(np.count_nonzero(wood_tone) / wood_tone.size)
 
 
-def propose_suspected_anomalies(
+def propose_defect_regions(
     image: np.ndarray,
     existing: Sequence[Detection] = (),
 ) -> list[Detection]:
-    """Find enclosed dark regions on wood-toned images as review-only candidates.
+    """Locate dark regions for a second model pass, never as public detections.
 
-    These candidates are deliberately assigned a separate class. They are not
-    model predictions and must never be reported as one of the six trained classes.
+    The internal class -1 and geometric score are discarded after classification.
+    Only the model's actual class and confidence may reach the response.
     """
     if not ANOMALY_FALLBACK_ENABLED or wood_tone_ratio(image) < ANOMALY_MIN_WOOD_RATIO:
         return []
@@ -204,7 +212,7 @@ def propose_suspected_anomalies(
         fill_ratio = area / float(box_width * box_height)
         score = min(0.75, 0.35 + min(0.25, area_ratio * 5) + min(0.15, fill_ratio * 0.3))
         candidate = Detection(
-            class_id=SUSPECTED_ANOMALY_CLASS_ID,
+            class_id=-1,
             confidence=score,
             x1=float(x),
             y1=float(y),
@@ -217,6 +225,34 @@ def propose_suspected_anomalies(
 
     candidates.sort(key=lambda item: item[0], reverse=True)
     return [item[1] for item in candidates[:ANOMALY_MAX_CANDIDATES]]
+
+
+def classify_defect_regions(
+    image: np.ndarray,
+    candidates: Sequence[Detection],
+    classify: PredictFunction,
+    confidence_threshold: float = 0.25,
+) -> list[Detection]:
+    """Review contextual crops; keep only actual model boxes near the proposal."""
+    height, width = image.shape[:2]
+    classified = []
+    for candidate in candidates:
+        pad_x = max(48, round((candidate.x2 - candidate.x1) * 0.35))
+        pad_y = max(48, round((candidate.y2 - candidate.y1) * 0.35))
+        left, top = max(0, int(candidate.x1) - pad_x), max(0, int(candidate.y1) - pad_y)
+        right, bottom = min(width, int(candidate.x2) + pad_x), min(height, int(candidate.y2) + pad_y)
+        if right <= left or bottom <= top:
+            continue
+        predictions, names = classify(image[top:bottom, left:right], TILE_IMAGE_SIZE)
+        valid = [item for item in predictions if (
+            0 <= item.class_id < len(MODEL_CLASS_NAMES)
+            and names.get(item.class_id) == MODEL_CLASS_NAMES[item.class_id]
+            and np.isfinite(item.confidence) and confidence_threshold <= item.confidence <= 1
+        )]
+        for item in sanitize_detections(offset_detections(valid, left, top), width, height):
+            if overlap_over_smaller(candidate, item) >= 0.20:
+                classified.append(item)
+    return classified
 
 
 def adaptive_tiling_reason(image: np.ndarray, detections: Sequence[Detection]) -> str | None:
@@ -243,20 +279,123 @@ def run_tiled_prediction(
     predict: PredictFunction,
     tile_size: int = TILE_IMAGE_SIZE,
     overlap: float = TILE_OVERLAP,
+    *,
+    grayscale: bool = False,
+    window_ratio: float = 0.78,
 ) -> tuple[list[Detection], Mapping[int, str], int]:
     height, width = image.shape[:2]
-    effective_width = min(tile_size, width)
-    effective_height = min(tile_size, height)
-    x_positions = sliding_positions(width, effective_width, overlap)
-    y_positions = sliding_positions(height, effective_height, overlap)
+    # Physical crop size and model input size are different. Even small images
+    # need real crops; resizing an entire 860px photo to 896px is not slicing.
+    small_photo = max(width, height) <= TILE_IMAGE_SIZE * 1.5
+    window = (min(TILE_WINDOW_SIZE, max(128, round(min(width, height) * window_ratio / 32) * 32))
+              if small_photo else tile_size)
+    while True:
+        effective_width, effective_height = min(window, width), min(window, height)
+        x_positions = sliding_positions(width, effective_width, overlap)
+        y_positions = sliding_positions(height, effective_height, overlap)
+        if len(x_positions) * len(y_positions) <= MAX_TILE_COUNT:
+            break
+        window = max(window + 1, int(np.ceil(window * 1.2)))
+    # Spread the final overlap evenly instead of making near-identical edge crops.
+    if small_photo:
+        x_positions = np.linspace(0, width - effective_width, len(x_positions)).round().astype(int)
+        y_positions = np.linspace(0, height - effective_height, len(y_positions)).round().astype(int)
     combined: list[Detection] = []
     names: Mapping[int, str] = {}
     for y in y_positions:
         for x in x_positions:
             tile = image[y : y + effective_height, x : x + effective_width]
+            if grayscale:
+                tile = cv2.cvtColor(cv2.cvtColor(tile, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
             tile_detections, names = predict(tile, tile_size)
-            combined.extend(offset_detections(tile_detections, x, y))
+            valid = sanitize_detections(tile_detections, effective_width, effective_height)
+            # Gray views are specifically for cracks. Color-sensitive classes
+            # cannot be confirmed from a view that removed their color evidence.
+            if grayscale:
+                valid = [item for item in valid if names.get(item.class_id) == "split"]
+            valid = [item for item in valid if not is_crop_filling_detection(item, effective_width, effective_height)]
+            combined.extend(offset_detections(valid, int(x), int(y)))
     return combined, names, len(x_positions) * len(y_positions)
+
+
+def sanitize_detections(detections: Sequence[Detection], width: int, height: int,
+                        confidence_threshold: float = 0.0) -> list[Detection]:
+    valid = []
+    for item in detections:
+        if not 0 <= item.class_id < len(MODEL_CLASS_NAMES):
+            continue
+        if not np.isfinite([item.confidence, item.x1, item.y1, item.x2, item.y2]).all():
+            continue
+        if not confidence_threshold <= item.confidence <= 1:
+            continue
+        x1, x2 = np.clip([item.x1, item.x2], 0, width)
+        y1, y2 = np.clip([item.y1, item.y2], 0, height)
+        if x2 - x1 >= 1 and y2 - y1 >= 1:
+            valid.append(Detection(item.class_id, item.confidence, float(x1), float(y1), float(x2), float(y2)))
+    return valid
+
+
+def is_crop_filling_detection(item: Detection, width: int, height: int) -> bool:
+    margin = max(2, min(width, height) * 0.025)
+    edges = sum((item.x1 <= margin, item.y1 <= margin,
+                 item.x2 >= width - margin, item.y2 >= height - margin))
+    ratio = (item.x2 - item.x1) * (item.y2 - item.y1) / (width * height)
+    return item.class_id != 4 and edges >= 3 and ratio >= 0.65
+
+
+def enhance_contrast(image: np.ndarray) -> np.ndarray:
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    lab[:, :, 0] = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(lab[:, :, 0])
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
+def trace_confirmed_cracks(image: np.ndarray, detections: Sequence[Detection]) -> list[Detection]:
+    """Extend model-confirmed crack fragments along connected dark ridges.
+
+    Never creates a new class or changes confidence. Large, dense components
+    and long full-width board joins cannot extend a detection.
+    """
+    if not CRACK_TRACE_ENABLED or not any(item.class_id == 4 for item in detections):
+        return list(detections)
+    height, width = image.shape[:2]
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    kernel_size = max(7, min(21, round(min(width, height) * 0.026) | 1))
+    ridge = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT,
+                           cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size)))
+    mask = ((ridge > 45) & (gray < 85)).astype(np.uint8) * 255
+    mask[np.count_nonzero(mask, axis=1) > width * 0.40, :] = 0
+    # Do not erase long vertical cracks merely because they reach the edge.
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
+    refined = []
+    for item in detections:
+        if item.class_id != 4:
+            refined.append(item)
+            continue
+        patch = labels[int(item.y1):int(np.ceil(item.y2)), int(item.x1):int(np.ceil(item.x2))]
+        ids, counts = np.unique(patch[patch > 0], return_counts=True)
+        if not len(ids) or max(counts) < 8 or max(counts) / sum(counts) < 0.6:
+            refined.append(item)
+            continue
+        x, y, w, h, area = stats[int(ids[np.argmax(counts)])]
+        old_length = max(item.x2 - item.x1, item.y2 - item.y1)
+        thin = 0.01 <= area / (w * h) <= 0.25 or min(w, h) <= kernel_size * 0.5
+        if not (1.5 * old_length < max(w, h) <= 8 * old_length
+                and w * h <= width * height * 0.12 and thin):
+            refined.append(item)
+            continue
+        refined.append(Detection(4, item.confidence, min(item.x1, float(x)), min(item.y1, float(y)),
+                                 max(item.x2, float(x + w)), max(item.y2, float(y + h))))
+    return refined
+
+
+def additional_view_detections(items: Sequence[Detection], existing: Sequence[Detection],
+                               threshold: float) -> list[Detection]:
+    """Preserve stable original boxes; require stronger evidence for new views."""
+    return [item for item in items if item.confidence >= max(threshold, 0.35)
+            and not any(item.class_id == old.class_id and (
+                intersection_over_union(item, old) >= 0.30 or overlap_over_smaller(item, old) >= 0.80
+            ) for old in existing)]
 
 
 def draw_detections(
@@ -281,20 +420,24 @@ def draw_detections(
         y1 = max(0, min(height - 1, int(round(item.y1))))
         x2 = max(0, min(width - 1, int(round(item.x2))))
         y2 = max(0, min(height - 1, int(round(item.y2))))
-        cv2.rectangle(canvas, (x1, y1), (x2, y2), color, 2, cv2.LINE_AA)
-        label_name = "review" if item.class_id == SUSPECTED_ANOMALY_CLASS_ID else class_names.get(
-            item.class_id, str(item.class_id)
-        )
-        label = f"{label_name} {item.confidence:.2f}"
-        (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-        label_top = max(0, y1 - text_height - baseline - 6)
-        cv2.rectangle(canvas, (x1, label_top), (min(width - 1, x1 + text_width + 8), y1), color, -1)
+        line_width = max(2, min(5, round(max(width, height) / 700)))
+        cv2.rectangle(canvas, (x1, y1), (x2, y2), (240, 246, 242), line_width + 2, cv2.LINE_AA)
+        cv2.rectangle(canvas, (x1, y1), (x2, y2), color, line_width, cv2.LINE_AA)
+        label_name = class_names.get(item.class_id, str(item.class_id))
+        label = f"{label_name} {item.confidence * 100:.1f}%"
+        font_scale = max(0.45, min(1.1, max(width, height) / 1700))
+        (text_width, text_height), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+        label_height = text_height + baseline + 8
+        label_left = max(0, min(x1, width - text_width - 8))
+        label_top = y1 - label_height if y1 >= label_height else min(y1 + 2, max(0, height - label_height))
+        cv2.rectangle(canvas, (label_left, label_top),
+                      (min(width - 1, label_left + text_width + 8), label_top + label_height), color, -1)
         cv2.putText(
             canvas,
             label,
-            (x1 + 4, max(text_height + 1, y1 - baseline - 3)),
+            (label_left + 4, label_top + text_height + 4),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
+            font_scale,
             (246, 249, 246),
             1,
             cv2.LINE_AA,
@@ -307,6 +450,8 @@ def run_inference(
     requested_mode: str,
     predict: PredictFunction,
     standard_image_size: int,
+    classify_candidate: PredictFunction | None = None,
+    confidence_threshold: float = 0.25,
 ) -> InferenceOutcome:
     started = perf_counter()
     height, width = image.shape[:2]
@@ -318,7 +463,11 @@ def run_inference(
         reason = "REQUESTED_FAST"
         tile_count = 1
     elif requested_mode == "ACCURATE":
-        detections, class_names, tile_count = run_tiled_prediction(image, predict)
+        whole, class_names = predict(image, standard_image_size)
+        tiled, tiled_names, tiled_count = run_tiled_prediction(image, predict)
+        detections = [*whole, *tiled]
+        class_names = tiled_names or class_names
+        tile_count = 1 + tiled_count
         actual_mode = "TILED_ACCURATE"
         reason = "REQUESTED_ACCURATE"
     else:
@@ -336,15 +485,35 @@ def run_inference(
             reason = "FIRST_PASS_CONFIDENT"
             tile_count = 1
 
-    merged = class_aware_nms(detections)
-    should_review_anomalies = requested_mode != "FAST" and (
-        not merged or all(touches_image_edge(item, width, height) for item in merged)
-    )
-    if should_review_anomalies:
-        suspected = propose_suspected_anomalies(image, merged)
-        if suspected:
-            merged = class_aware_nms([*merged, *suspected])
-            class_names = {**class_names, SUSPECTED_ANOMALY_CLASS_ID: SUSPECTED_ANOMALY_CLASS_NAME}
+    # One confident object does not prove the rest of the surface is defect-free.
+    # Review contrast once, and use gray crack views only when slicing is needed.
+    if requested_mode != "FAST" and ENHANCED_REVIEW_ENABLED:
+        enhanced, enhanced_names = predict(enhance_contrast(image), TILE_IMAGE_SIZE)
+        detections = [*detections, *additional_view_detections(enhanced, detections, confidence_threshold)]
+        class_names = enhanced_names or class_names
+        tile_count += 1
+        if actual_mode in {"ADAPTIVE_TILED", "TILED_ACCURATE"}:
+            cracks, _, crack_count = run_tiled_prediction(image, predict, grayscale=True)
+            detections = [*detections, *additional_view_detections(cracks, detections, confidence_threshold)]
+            tile_count += crack_count
+        if requested_mode == "ACCURATE" and max(width, height) <= TILE_IMAGE_SIZE * 1.5:
+            # A second physical scale exposes thinner cracks without rotating
+            # wood texture or adding unsupported color-sensitive classes.
+            fine_cracks, _, fine_count = run_tiled_prediction(image, predict, grayscale=True, window_ratio=0.67)
+            detections = [*detections, *additional_view_detections(
+                fine_cracks, detections, max(confidence_threshold, 0.45))]
+            tile_count += fine_count
+
+    merged = class_aware_nms(sanitize_detections(detections, width, height, confidence_threshold))
+    if requested_mode != "FAST" and classify_candidate is not None:
+        candidates = propose_defect_regions(image, merged)
+        if candidates:
+            classified = classify_defect_regions(image, candidates, classify_candidate, confidence_threshold)
+            tile_count += len(candidates)
+            merged = class_aware_nms([*merged, *classified])
+            class_names = dict(enumerate(MODEL_CLASS_NAMES))
+    if requested_mode != "FAST":
+        merged = class_aware_nms(trace_confirmed_cracks(image, merged))
     plotted = draw_detections(image, merged, class_names)
     duration_ms = max(1, round((perf_counter() - started) * 1000))
     return InferenceOutcome(

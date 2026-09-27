@@ -14,14 +14,18 @@ import java.util.Map;
 @Service
 public class QualityScoringService {
 
-    private static final Map<String, String> CLASS_LABELS = Map.of(
-            "split", "裂纹",
-            "dry_knot", "干节",
-            "sound_knot", "健全节",
-            "edge_knot", "边节",
-            "small_knot", "小节",
-            "wave", "波纹",
-            "suspected_anomaly", "疑似异常（需复核）"
+    private static final Map<String, String> CLASS_LABELS = Map.ofEntries(
+            Map.entry("dry_knot", "干节"),
+            Map.entry("sound_knot", "健全节"),
+            Map.entry("edge_knot", "边节"),
+            Map.entry("small_knot", "小节"),
+            Map.entry("split", "裂纹"),
+            Map.entry("wave", "波纹"),
+            Map.entry("decay", "腐朽/腐烂"),
+            Map.entry("large_hole", "大型空洞/树洞"),
+            Map.entry("bark_pocket", "树皮脱落/夹皮"),
+            Map.entry("stain", "颜色异常/污渍"),
+            Map.entry("suspected_anomaly", "疑似异常（需复核）")
     );
 
     private final QualityScoringProperties properties;

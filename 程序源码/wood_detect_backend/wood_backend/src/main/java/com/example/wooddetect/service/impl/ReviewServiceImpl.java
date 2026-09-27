@@ -44,7 +44,8 @@ import java.util.zip.ZipOutputStream;
 public class ReviewServiceImpl implements ReviewService {
 
     private static final List<String> CLASS_NAMES = List.of(
-            "dry_knot", "sound_knot", "edge_knot", "small_knot", "split", "wave");
+            "dry_knot", "sound_knot", "edge_knot", "small_knot", "split", "wave",
+            "decay", "large_hole", "bark_pocket", "stain");
     private static final Map<String, Integer> CLASS_IDS = classIds();
     private static final Set<String> REVIEW_STATUSES = Set.of("CORRECT", "INCORRECT", "CORRECTED");
 
@@ -324,7 +325,8 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private String dataYaml() {
-        StringBuilder yaml = new StringBuilder("path: .\ntrain: images/train\nval: images/train\nnc: 6\nnames:\n");
+        StringBuilder yaml = new StringBuilder("path: .\ntrain: images/train\nval: images/train\nnc: ")
+                .append(CLASS_NAMES.size()).append("\nnames:\n");
         for (int i = 0; i < CLASS_NAMES.size(); i++) {
             yaml.append("  ").append(i).append(": ").append(CLASS_NAMES.get(i)).append('\n');
         }

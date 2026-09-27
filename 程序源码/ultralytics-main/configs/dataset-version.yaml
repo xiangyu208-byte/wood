@@ -1,16 +1,18 @@
 dataset:
-  name: wood-defect-12class
-  version: 2026-09-26-v1
-  status: assembled-local-validated
-  path: ../../../datasets/wood_defect_12class
-  images: 5857
-  objects: 16946
-  train_images: 4640
-  validation_images: 930
-  test_images: 287
+  name: wood-defect-10class
+  version: 2026-09-27-v1
+  status: assembled-validated-local-not-in-runtime-release
+  path: ../../../datasets/wood_defect_10class
+  images: 6119
+  objects: 17780
+  train_images: 4847
+  validation_images: 967
+  test_images: 305
   excludes:
     - marrow
     - pith_damage
+    - insect_damage
+    - mold
   class_names:
     - dry_knot
     - sound_knot
@@ -20,18 +22,17 @@ dataset:
     - wave
     - decay
     - large_hole
-    - insect_damage
-    - mold
-    - bark_loss
+    - bark_pocket
     - stain
-  validation_report: ../../../datasets/wood_defect_12class/metadata/validation_report.json
-  source_manifest: ../../../datasets/wood_defect_12class/metadata/sources.json
-  annotation_manifest: ../../../datasets/wood_defect_12class/metadata/images.jsonl
+  validation_report: ../../../datasets/wood_defect_10class/metadata/validation_report.json
+  source_manifest: ../../../datasets/wood_defect_10class/metadata/sources.json
+  annotation_manifest: ../../../datasets/wood_defect_10class/metadata/images.jsonl
   license: mixed-noncommercial-research
   license_note: >-
-    The assembled dataset includes CC BY-NC 4.0 Oak data and CC BY-NC-SA 4.0
-    MVTec data. Replace those sources before commercial use.
+    The assembled dataset includes CC BY-NC 4.0 Oak data. Replace that source
+    before commercial use.
   quality_note: >-
-    Mold and insect damage remain low-resource classes. The single weak mold
-    image in each evaluation split is only an engineering smoke check and is
-    not sufficient for a production-quality accuracy claim.
+    Insect damage (45 images/70 boxes) and mold (7 images/7 boxes) were removed
+    because they cannot support stable training or trustworthy evaluation.
+    Training images and labels are intentionally not part of the GitHub runtime
+    release; the deployed PT/ONNX weights do not require them for inference.

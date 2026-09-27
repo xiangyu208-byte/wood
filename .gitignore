@@ -21,6 +21,8 @@ Thumbs.db
 /datasets/datasets/
 /datasets/wood_defect_12class/images/
 /datasets/wood_defect_12class/labels/
+/datasets/wood_defect_10class/images/
+/datasets/wood_defect_10class/labels/
 /datasets/metadata/openverse_candidates.json
 
 # 仅供本地参考，不上传到 GitHub

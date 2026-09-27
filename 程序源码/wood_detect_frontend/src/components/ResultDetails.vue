@@ -10,7 +10,7 @@
 
     <p v-if="result.errorMessage" class="inline-error" role="alert">{{ result.errorMessage }}</p>
     <p v-if="hasSuspectedAnomaly(result.details)" class="inline-warning" role="status">
-      检测到训练类别之外的明显暗部或空洞，已作为“疑似异常”补充标记。候选强度不是模型置信度，请结合原图人工复核。
+      此历史记录由旧版模型生成，含未分类的异常区域。请重新识别以获得新版 10 类模型的具体缺陷类别与真实置信度。
     </p>
     <p v-if="isReviewPending(result)" class="inline-warning" role="status">
       已自动加入人工复核队列：{{ reviewReasonLabel(result.reviewReason) }}。
@@ -86,7 +86,7 @@
     <div v-if="result.status === 'SUCCESS'" class="detail-table-wrap">
       <table class="detail-table">
         <caption>缺陷明细</caption>
-        <thead><tr><th>类别</th><th>置信度 / 候选强度</th><th>坐标范围</th></tr></thead>
+        <thead><tr><th>类别</th><th>置信度</th><th>坐标范围</th></tr></thead>
         <tbody>
           <tr v-for="(detail, index) in result.details || []" :key="`${detail.className}-${index}`">
             <td><strong>{{ classNameZh(detail.className) }}</strong><small>{{ detail.className }}</small></td>

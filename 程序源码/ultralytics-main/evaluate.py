@@ -20,9 +20,9 @@ from wood_pipeline.common import (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="评估 6 类木材缺陷模型并生成曲线")
+    parser = argparse.ArgumentParser(description="评估 10 类木材缺陷模型并生成曲线")
     parser.add_argument("--model", default="runs/detect/best.pt")
-    parser.add_argument("--data", default="yolo-bvn.yaml")
+    parser.add_argument("--data", default="yolo-bvn-10class.yaml")
     parser.add_argument("--split", default="val", choices=("val", "test"))
     parser.add_argument("--imgsz", type=int, default=896)
     parser.add_argument("--batch", type=int, default=16)
@@ -43,7 +43,7 @@ def main() -> None:
         device = "cpu"
 
     model = YOLO(str(model_path))
-    require_expected_names(model.names, str(model_path))
+    require_expected_names(model.names, str(model_path), allow_legacy=True)
     metrics = model.val(
         data=str(data_path),
         split=args.split,

@@ -62,7 +62,11 @@ test('任务活动态和终态不会混淆', () => {
 test('缺陷类别和置信度按用户可读格式展示', () => {
   assert.equal(classNameZh('dry_knot'), '干节')
   assert.equal(classNameZh('split'), '裂纹')
-  assert.equal(classNameZh('suspected_anomaly'), '疑似异常（需复核）')
+  assert.equal(classNameZh('decay'), '腐朽/腐烂')
+  assert.equal(classNameZh('large_hole'), '大型空洞/树洞')
+  assert.equal(classNameZh('bark_pocket'), '树皮脱落/夹皮')
+  assert.equal(classNameZh('stain'), '颜色异常/污渍')
+  assert.equal(classNameZh('suspected_anomaly'), '旧版未分类区域')
   assert.equal(classNameZh('custom_class'), 'custom_class')
   assert.equal(formatConfidence(0.8764), '87.6%')
   assert.equal(formatConfidence(null), '—')
@@ -70,6 +74,10 @@ test('缺陷类别和置信度按用户可读格式展示', () => {
   assert.equal(detailScoreLabel({ className: 'suspected_anomaly', confidence: 0.65 }), '候选强度 65.0%')
   assert.equal(hasSuspectedAnomaly([{ className: 'split' }, { className: 'suspected_anomaly' }]), true)
   assert.equal(reviewCandidateCount([{ className: 'split' }, { className: 'suspected_anomaly' }]), 1)
+  assert.equal(reviewCandidateCount([
+    { className: 'decay', confidence: 0.21 }, { className: 'large_hole', confidence: 0.7 },
+    { className: 'stain', confidence: null }, { className: 'split', confidence: 'invalid' }
+  ]), 1)
 })
 
 test('自适应推理元数据按用户可读格式展示', () => {

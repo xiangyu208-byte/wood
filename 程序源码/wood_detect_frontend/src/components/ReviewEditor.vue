@@ -55,7 +55,7 @@
       <el-button type="primary" :loading="saving === 'CORRECTED'" :disabled="Boolean(saving)" @click="saveReview('CORRECTED')">保存人工修正</el-button>
       <el-button type="danger" plain :loading="saving === 'INCORRECT'" :disabled="Boolean(saving)" @click="saveReview('INCORRECT')">标记结果错误</el-button>
     </div>
-    <p class="review-note">“结果正确”会采用原始六类模型框；“保存人工修正”会采用当前表格；“结果错误”会保存为空标签负样本。</p>
+    <p class="review-note">“结果正确”会采用原始检测框；“保存人工修正”会采用当前表格；“结果错误”会保存为空标签负样本。</p>
   </section>
 </template>
 
@@ -74,7 +74,10 @@ import {
 
 const props = defineProps({ result: { type: Object, required: true } })
 const emit = defineEmits(['saved'])
-const classNames = ['dry_knot', 'sound_knot', 'edge_knot', 'small_knot', 'split', 'wave']
+const classNames = [
+  'dry_knot', 'sound_knot', 'edge_knot', 'small_knot', 'split', 'wave',
+  'decay', 'large_hole', 'bark_pocket', 'stain'
+]
 const classOptions = classNames.map(value => ({ value, label: classNameZh(value) }))
 const annotations = ref([])
 const comment = ref('')

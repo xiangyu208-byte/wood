@@ -7,7 +7,7 @@
         <el-select :model-value="modelValue.modelMode" aria-label="模型模式" @update:model-value="update('modelMode', $event)">
           <el-option label="快速整图（512px）" value="FAST" />
           <el-option label="自适应（推荐）" value="STANDARD" />
-          <el-option label="精细切片（896px）" value="ACCURATE" />
+          <el-option label="精细补检" value="ACCURATE" />
         </el-select>
       </label>
 
@@ -34,7 +34,7 @@
         </el-select>
       </label>
     </div>
-    <p class="settings-note">自适应模式先检查整图，遇到高分辨率、低置信度、小目标或仅边缘命中时自动启用 20% 重叠切片。模型仍无法覆盖时，系统会把木材图中的明显暗部和空洞标为“疑似异常（需复核）”。精细切片耗时更长。FP16 仅适用于 CUDA。</p>
+    <p class="settings-note">当前模型识别 10 类缺陷。自适应模式会根据图片与首轮结果放大局部，并增强对比度、复查裂纹；精细补检增加小图的细裂纹检查。所有结果遵守设置的置信度阈值，新增增强视图结果至少达到 35%，保留真实置信度。降低阈值可能增加误检。精细补检耗时更长，FP16 仅适用于 CUDA。</p>
   </details>
 </template>
 

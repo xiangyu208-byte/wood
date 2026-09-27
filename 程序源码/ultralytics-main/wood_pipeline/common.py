@@ -19,9 +19,7 @@ EXPECTED_NAMES = (
     "wave",
     "decay",
     "large_hole",
-    "insect_damage",
-    "mold",
-    "bark_loss",
+    "bark_pocket",
     "stain",
 )
 
@@ -72,13 +70,13 @@ def require_expected_names(
         # NOTE: 旧版 6 类权重，允许通过验证但打印警告
         import warnings
         warnings.warn(
-            f"{source} 使用旧版 6 类权重，建议迁移到 12 类模型。",
+            f"{source} 使用旧版 6 类权重，建议迁移到 10 类模型。",
             stacklevel=2,
         )
         return
     raise ValueError(
         f"{source} 类别不一致。\n"
-        f"  期望 12 类: {EXPECTED_NAMES}\n"
+        f"  期望 10 类: {EXPECTED_NAMES}\n"
         f"  实际: {actual}"
     )
 

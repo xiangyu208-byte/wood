@@ -99,7 +99,11 @@ GPU 模式仅面向具备 NVIDIA 容器运行环境的平台。macOS 使用默�
 | `IMAGE_SIZE` | `640` | 推理输入尺寸 |
 | `MAX_CONCURRENT_INFERENCES` | `1` | 单进程并发推理上限 |
 | `INFERENCE_ACQUIRE_TIMEOUT_SECONDS` | `5` | 等待推理槽超时，超时返回 503 |
-| `TILE_IMAGE_SIZE` | `896` | 精细模式切片尺寸 |
+| `TILE_IMAGE_SIZE` | `896` | 局部模型输入尺寸 |
+| `TILE_WINDOW_SIZE` | `640` | 小图真实裁剪窗口上限 |
+| `MAX_TILE_COUNT` | `24` | 单视图最大切片数 |
+| `ENHANCED_REVIEW_ENABLED` | `true` | 对比度增强与灰度裂纹复查 |
+| `CRACK_TRACE_ENABLED` | `true` | 模型检出后的连续裂纹框补全 |
 | `TILE_OVERLAP` | `0.20` | 切片重叠比例 |
 | `NMS_IOU_THRESHOLD` | `0.50` | 跨切片按类别 NMS 阈值 |
 | `AUTO_MAX_DIMENSION` | `2560` | 自适应切片最长边阈值 |
@@ -166,19 +170,21 @@ CPU 模式把 ONNX 模型只读挂载到 `/models/best.onnx`；GPU 覆盖配置�
 cd ultralytics-main
 pip install -e .
 pip install -r requirements-model.txt
-python train.py --config configs/train.yaml
-python evaluate.py --model runs/detect/best.pt --data yolo-bvn.yaml
-python export_onnx.py --model runs/detect/best.pt --imgsz 896 --opset 17
-python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source path/to/images --device cpu
+python train.py --config configs/train-10class.yaml
+python evaluate.py --model runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt --data yolo-bvn-10class.yaml
+python export_onnx.py --model runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt --imgsz 896 --opset 17
+python benchmark.py --models runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.onnx --source path/to/images --device cpu
 ```
 
-详细模型身份、历史指标和复现边界见 `ultralytics-main/MODEL_REPORT.md`。数据集不在仓库中，训练和评估会在路径检查阶段停止；恢复数据后再生成混淆矩阵、PR/F1 曲线及正式指标。
+详细模型身份、历史指标和复现边界见 `ultralytics-main/MODEL_REPORT.md`。GitHub 运行版包含默认 PT/ONNX 权重，但不包含训练图片和标注；克隆后可以直接推理，重新训练、混淆矩阵和完整 PR/F1 复评需另行准备本地 10 类数据集。
 
 ## 自适应高分辨率推理
 
 - 快速整图：512px 单次推理。
 - 自适应：先执行 640px 整图推理，根据分辨率、首轮置信度和目标尺寸决定是否升级。
-- 精细切片：896px 切片、20% 重叠，坐标还原后使用按类别 NMS 合并重复框。
+- 精细补检：保留整图检测，执行真实局部裁剪、对比度增强和灰度裂纹复查，再还原坐标与去重。小图窗口按短边的 78% 对齐到 32 像素，上限 640；大图保留 896px 窗口，每视图最多 24 个切片，超出时增大窗口。
+
+最终优化保留相同的模型权重，推理版本后缀为 `-mv1`。所有公开框遵守请求阈值，新增增强视图至少为 0.35；暗部仅是内部提议，不强行归类、不输出“疑似异常”。裂纹连续暗线补全不修改模型类别或置信度。每次推理生成唯一结果文件，保留历史快照。
 
 检测结果和历史记录会显示请求模式、实际策略、选择依据、推理耗时和区域数。恢复验证集后，可运行：
 
@@ -193,13 +199,13 @@ docker compose exec inference python compare_modes.py \
 
 ## 可解释质量评分
 
-后端在识别成功时统计六类缺陷与疑似异常候选数量，计算检测框去重覆盖面积率和最大单框面积率，再按可配置权重从 100 分中逐项扣分。结果页显示质量分、A/B/C/D 等级、类别数量和每条扣分原因；历史页支持等级及分数区间筛选，CSV/Excel 会导出完整评价快照。升级前已有且具备图片尺寸的成功记录会在启动后自动补齐评分。
+后端在识别成功时统计十类缺陷数量，计算检测框去重覆盖面积率和最大单框面积率，再按可配置权重从 100 分中逐项扣分。腐朽、大型空洞、树皮脱落、污渍默认每框扣 15、12、6、3.5 分。结果页显示质量分、A/B/C/D 等级、类别数量和每条扣分原因；历史页支持等级及分数区间筛选，CSV/Excel 会导出完整评价快照。旧版异常记录仍兼容。
 
 质量等级仅为本项目内部评价规则，用于结果比较和人工复核参考，不属于任何行业强制标准。
 
 ## 主动学习与人工复核
 
-- 推理结果保存权重版本、最低置信度和自动复核原因；低置信度或疑似异常记录自动进入待复核队列。
+- 推理结果保存权重版本、最低置信度和自动复核原因；低置信度记录自动进入待复核队列，新请求不再生成疑似异常类别。
 - 记录详情支持确认正确、标记错误、修正类别和坐标、删除误检框及补充漏检框。人工标注单独保存，不覆盖原始模型明细。
 - 历史页支持模型版本、复核状态和待复核队列筛选，并展示各版本的人工确认率、纠错率、平均质量分和平均耗时变化。
 - “复核数据 YOLO”会导出已复核原图、YOLO 标签、`data.yaml`、说明和包含模型版本/复核状态的 `manifest.json`。未复核记录不会混入训练包。
@@ -274,4 +280,4 @@ GitHub Actions 会在推送和拉取请求时运行后端测试、前端测试/�
 
 前七阶段已完成工程标准化、跨平台容器、后端可靠性、前端体验、统一模型流水线、自适应高分辨率推理、可解释质量评分，以及主动学习与人工复核闭环。
 
-第五阶段已提供快速整图、自适应和精细切片推理，贯通实际策略、耗时与切片元数据；仍需恢复原数据集以独立复算模式精度，并补充更完整的集成、端到端测试和跨平台验收矩阵。
+第五阶段已提供快速整图、自适应和精细切片推理，贯通实际策略、耗时与切片元数据；数据集已经恢复，但仍需实际运行独立评估，并补充更完整的集成、端到端测试和跨平台验收矩阵。

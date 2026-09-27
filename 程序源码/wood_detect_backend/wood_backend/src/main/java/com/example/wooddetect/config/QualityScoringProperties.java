@@ -47,9 +47,13 @@ public class QualityScoringProperties {
 
     private static Map<String, Double> defaultWeights() {
         Map<String, Double> weights = new LinkedHashMap<>();
+        weights.put("decay", 15.0);
+        weights.put("large_hole", 12.0);
         weights.put("split", 8.0);
         weights.put("dry_knot", 6.0);
+        weights.put("bark_pocket", 6.0);
         weights.put("edge_knot", 5.0);
+        weights.put("stain", 3.5);
         weights.put("wave", 3.0);
         weights.put("sound_knot", 2.5);
         weights.put("small_knot", 2.0);

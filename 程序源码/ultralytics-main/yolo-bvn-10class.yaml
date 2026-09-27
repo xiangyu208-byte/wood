@@ -1,0 +1,18 @@
+# 木材表面缺陷检测数据集（正式 10 类）
+# 不含髓心破坏、虫蛀和霉变；虫蛀与霉变待数据量和独立评估集达标后再恢复。
+path: ../../datasets/wood_defect_10class
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: dry_knot        # 干节
+  1: sound_knot      # 健全节
+  2: edge_knot       # 边节
+  3: small_knot      # 小节
+  4: split           # 裂纹
+  5: wave            # 波纹
+  6: decay           # 腐朽/腐烂
+  7: large_hole      # 大型空洞/树洞
+  8: bark_pocket     # 树皮脱落/夹皮
+  9: stain           # 颜色异常/污渍

@@ -1,0 +1,278 @@
+{
+  "createdAt": "2026-09-27T10:09:29.827595+00:00",
+  "modelSha256": "33938785862176b20ef6a0e5737cf1e62972d4c8582990f12f4b8a6f615349d0",
+  "modelVersion": "best-339387858621-mv1",
+  "threshold": 0.25,
+  "matchIou": 0.5,
+  "testDefectImages": 15,
+  "valDefectImages": 8,
+  "realNormalImages": 3,
+  "syntheticNormalImages": 2,
+  "groundTruthBoxes": 74,
+  "unlabeledUserImageExcluded": true,
+  "notMapOrFullIndependentEvaluation": true,
+  "baselineStandard": {
+    "labeledSamples": 28,
+    "tp": 44,
+    "fp": 61,
+    "fn": 30,
+    "precision": 0.41904761904761906,
+    "recall": 0.5945945945945946,
+    "meanDurationMs": 404.83,
+    "realNormalFalsePositives": 8,
+    "syntheticNormalFalsePositives": 0
+  },
+  "optimizedStandard": {
+    "labeledSamples": 28,
+    "tp": 48,
+    "fp": 63,
+    "fn": 26,
+    "precision": 0.43243243243243246,
+    "recall": 0.6486486486486487,
+    "meanDurationMs": 1208.69,
+    "realNormalFalsePositives": 1,
+    "syntheticNormalFalsePositives": 0
+  },
+  "optimizedAccurate": {
+    "labeledSamples": 28,
+    "tp": 48,
+    "fp": 66,
+    "fn": 26,
+    "precision": 0.42105263157894735,
+    "recall": 0.6486486486486487,
+    "meanDurationMs": 1492.93,
+    "realNormalFalsePositives": 1,
+    "syntheticNormalFalsePositives": 0
+  },
+  "selection": {
+    "counts": [
+      6,
+      8,
+      3,
+      3,
+      8,
+      3,
+      3,
+      4,
+      3,
+      5
+    ],
+    "samples": [
+      {
+        "name": "oak_10-13-25_10-35-07-438_Bot.jpg",
+        "classes": [
+          6
+        ],
+        "split": "test"
+      },
+      {
+        "name": "oak_10-13-25_10-35-07-438_Top.jpg",
+        "classes": [
+          6
+        ],
+        "split": "test"
+      },
+      {
+        "name": "oak_10-13-25_10-35-36-465_Bot.jpg",
+        "classes": [
+          6
+        ],
+        "split": "test"
+      },
+      {
+        "name": "spruce_bark_0009.jpg",
+        "classes": [
+          8
+        ],
+        "split": "test"
+      },
+      {
+        "name": "spruce_bark_0010.jpg",
+        "classes": [
+          8
+        ],
+        "split": "test"
+      },
+      {
+        "name": "spruce_bark_0011.jpg",
+        "classes": [
+          8
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_103400034.jpg",
+        "classes": [
+          9
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_103400037.jpg",
+        "classes": [
+          1,
+          9
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_103400075.jpg",
+        "classes": [
+          1,
+          9
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_104900064.jpg",
+        "classes": [
+          0,
+          1,
+          4,
+          7
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_104900071.jpg",
+        "classes": [
+          1,
+          7
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_105600013.jpg",
+        "classes": [
+          0,
+          7
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_105600015.jpg",
+        "classes": [
+          0,
+          7
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_105600023.jpg",
+        "classes": [
+          0,
+          4,
+          9
+        ],
+        "split": "test"
+      },
+      {
+        "name": "vsb_109600025.jpg",
+        "classes": [
+          1,
+          4,
+          9
+        ],
+        "split": "test"
+      },
+      {
+        "name": "zenodo6_st1018_1.jpg",
+        "classes": [
+          2
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1026_1.jpg",
+        "classes": [
+          0,
+          1,
+          4,
+          5
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1026_5.jpg",
+        "classes": [
+          0,
+          1,
+          4,
+          5
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1028_3.jpg",
+        "classes": [
+          2,
+          4
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1030_6.jpg",
+        "classes": [
+          4,
+          5
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1037_2.jpg",
+        "classes": [
+          1,
+          3,
+          4
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1038.jpg",
+        "classes": [
+          3
+        ],
+        "split": "val"
+      },
+      {
+        "name": "zenodo6_st1043_4.jpg",
+        "classes": [
+          2,
+          3
+        ],
+        "split": "val"
+      },
+      {
+        "name": "negative-uniform-wood.jpg",
+        "classes": [],
+        "synthetic": true
+      },
+      {
+        "name": "negative-white.jpg",
+        "classes": [],
+        "synthetic": true
+      },
+      {
+        "name": "negative-wsad-0000.jpg",
+        "classes": [],
+        "source": "datasets\\raw\\wsad\\data\\test\\good\\0000.jpg"
+      },
+      {
+        "name": "negative-wsad-0001.jpg",
+        "classes": [],
+        "source": "datasets\\raw\\wsad\\data\\test\\good\\0001.jpg"
+      },
+      {
+        "name": "negative-wsad-0002.jpg",
+        "classes": [],
+        "source": "datasets\\raw\\wsad\\data\\test\\good\\0002.jpg"
+      }
+    ]
+  },
+  "webRecordId": 17,
+  "apiChecks": 9,
+  "pythonUnitTests": 21,
+  "frontendUnitTests": 6,
+  "deployedCpuOnly": true,
+  "codeSha256": "7efa67b9ebb6c494d5243aa6ecf3ec6087bbf30ec102d2a652c06ef64bc0e156"
+}

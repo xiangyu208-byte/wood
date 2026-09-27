@@ -176,7 +176,13 @@ class ReviewServiceImplTest {
         assertEquals("4 0.200000 0.200000 0.200000 0.200000\n",
                 entries.get("wood-active-learning/labels/train/7_sample.txt"));
         assertEquals(true, entries.containsKey("wood-active-learning/images/train/7_sample.jpg"));
-        assertEquals(true, entries.get("wood-active-learning/data.yaml").contains("4: split"));
+        String dataYaml = entries.get("wood-active-learning/data.yaml");
+        assertEquals(true, dataYaml.contains("nc: 10"));
+        assertEquals(true, dataYaml.contains("4: split"));
+        assertEquals(true, dataYaml.contains("8: bark_pocket"));
+        assertEquals(true, dataYaml.contains("9: stain"));
+        assertEquals(false, dataYaml.contains("insect_damage"));
+        assertEquals(false, dataYaml.contains("mold"));
         assertEquals(true, entries.get("wood-active-learning/manifest.json").contains("best-abc123"));
     }
 

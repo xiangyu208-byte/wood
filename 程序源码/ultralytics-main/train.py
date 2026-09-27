@@ -20,8 +20,8 @@ from wood_pipeline.common import (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="训练最终 6 类木材缺陷检测模型")
-    parser.add_argument("--config", default="configs/train.yaml", help="训练配置 YAML")
+    parser = argparse.ArgumentParser(description="训练正式木材缺陷检测模型")
+    parser.add_argument("--config", default="configs/train-10class.yaml", help="训练配置 YAML")
     parser.add_argument("--data", help="覆盖数据集 YAML")
     parser.add_argument("--model", help="覆盖模型 YAML/PT")
     parser.add_argument("--device", help="覆盖设备，例如 cpu、0、0,1")

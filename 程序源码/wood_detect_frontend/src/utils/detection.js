@@ -14,31 +14,35 @@ export const CLASS_NAME_MAP = {
   small_knot: '小节',
   split: '裂纹',
   wave: '波纹',
-  suspected_anomaly: '疑似异常（需复核）'
+  decay: '腐朽/腐烂',
+  large_hole: '大型空洞/树洞',
+  bark_pocket: '树皮脱落/夹皮',
+  stain: '颜色异常/污渍',
+  suspected_anomaly: '旧版未分类区域'
 }
 
 export const REQUESTED_MODE_LABELS = {
   FAST: '快速整图',
   STANDARD: '自适应',
-  ACCURATE: '精细切片'
+  ACCURATE: '精细补检'
 }
 
 export const ACTUAL_MODE_LABELS = {
   FAST_WHOLE: '快速整图',
   STANDARD_WHOLE: '标准整图',
   ADAPTIVE_TILED: '自适应切片',
-  TILED_ACCURATE: '精细切片'
+  TILED_ACCURATE: '精细补检'
 }
 
 export const DECISION_REASON_LABELS = {
   REQUESTED_FAST: '按设置执行快速整图',
-  REQUESTED_ACCURATE: '按设置执行重叠切片',
+  REQUESTED_ACCURATE: '按设置执行整图和局部补检',
   HIGH_RESOLUTION: '图片分辨率较高，自动启用切片',
   NO_FIRST_PASS_DETECTION: '首轮未检出目标，自动复查局部',
   LOW_FIRST_PASS_CONFIDENCE: '首轮置信度较低，自动复查局部',
   SMALL_FIRST_PASS_TARGET: '首轮发现小目标，自动复查局部',
   EDGE_ONLY_FIRST_PASS: '首轮结果仅位于图片边缘，自动复查整幅图片',
-  FIRST_PASS_CONFIDENT: '首轮结果稳定，保留整图推理'
+  FIRST_PASS_CONFIDENT: '首轮结果稳定，整图增强复查'
 }
 
 export const REVIEW_STATUS_META = {
@@ -50,7 +54,7 @@ export const REVIEW_STATUS_META = {
 
 export const REVIEW_REASON_LABELS = {
   LOW_CONFIDENCE: '存在低置信度检测',
-  SUSPECTED_ANOMALY: '存在疑似异常复核候选'
+  SUSPECTED_ANOMALY: '存在旧版未分类区域待复核'
 }
 
 export const ANNOTATION_SOURCE_LABELS = {
@@ -82,8 +86,11 @@ export function hasSuspectedAnomaly(details = []) {
   return details.some(detail => detail.className === 'suspected_anomaly')
 }
 
-export function reviewCandidateCount(details = []) {
-  return details.filter(detail => detail.className === 'suspected_anomaly').length
+export function reviewCandidateCount(details = [], lowConfidenceThreshold = 0.45) {
+  return details.filter(detail => detail.className === 'suspected_anomaly' || (
+    detail.confidence !== null && detail.confidence !== undefined && detail.confidence !== '' &&
+    Number.isFinite(Number(detail.confidence)) && Number(detail.confidence) < lowConfidenceThreshold
+  )).length
 }
 
 export function requestedModeLabel(mode) {

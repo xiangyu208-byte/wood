@@ -50,6 +50,10 @@ quality-scoring:
     wave: ${QUALITY_WEIGHT_WAVE:3}
     sound_knot: ${QUALITY_WEIGHT_SOUND_KNOT:2.5}
     small_knot: ${QUALITY_WEIGHT_SMALL_KNOT:2}
+    decay: ${QUALITY_WEIGHT_DECAY:15}
+    large_hole: ${QUALITY_WEIGHT_LARGE_HOLE:12}
+    bark_pocket: ${QUALITY_WEIGHT_BARK_POCKET:6}
+    stain: ${QUALITY_WEIGHT_STAIN:3.5}
     suspected_anomaly: ${QUALITY_WEIGHT_SUSPECTED_ANOMALY:2}
   unknown-category-weight: ${QUALITY_WEIGHT_UNKNOWN:3}
   area-penalty-per-percent: ${QUALITY_AREA_PENALTY_PER_PERCENT:0.35}

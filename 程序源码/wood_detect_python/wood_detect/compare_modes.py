@@ -12,7 +12,7 @@ import cv2
 
 
 SUPPORTED_IMAGES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-CLASS_NAMES = ("dry_knot", "sound_knot", "edge_knot", "small_knot", "split", "wave")
+from inference_pipeline import MODEL_CLASS_NAMES as CLASS_NAMES
 
 
 @dataclass(frozen=True)
@@ -171,7 +171,8 @@ def main() -> None:
             predictions = response_boxes(payload)
             durations.append(payload["inferenceDurationMs"])
             review_candidates = sum(
-                item.get("className") == "suspected_anomaly" for item in payload.get("details", [])
+                item.get("className") == "suspected_anomaly" or item.get("confidence", 1) < 0.45
+                for item in payload.get("details", [])
             )
             model_detections = sum(
                 item.get("className") != "suspected_anomaly" for item in payload.get("details", [])

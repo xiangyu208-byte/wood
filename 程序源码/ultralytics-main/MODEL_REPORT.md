@@ -2,24 +2,27 @@
 
 ## 结论
 
-当前 `best.pt` 是 Ultralytics 8.4.21 训练的 6 类 YOLOv8s-C2fPSA 检测模型。第五阶段将 ONNX 更新为动态输入尺寸、opset 17 的 `best.onnx`，并使用 ONNX Runtime `CPUExecutionProvider` 完成计算图校验以及 512×512、640×640、896×896 三种尺寸前向验证，以支持快速整图和高分辨率切片推理。
+2026-09-27 默认 `best.pt` 已替换为 Ultralytics 8.4.21 新训练的 10 类 YOLOv8s-C2fPSA 检测模型。训练记录共 162 轮，按 mAP50–95 最优选择第 161 轮 `weights/best.pt`，不是最后一轮 `last.pt`。同步导出动态尺寸、opset 17 的 `best.onnx`，通过 ONNX 计算图校验与 CPU 512×512、640×640、896×896 三档前向检查。
 
-仓库不包含训练/验证数据集，因此本报告把权重内保存的历史指标与可独立复现的评估结果严格分开。Precision、Recall 和 mAP 是权重检查点携带的历史验证结果，目前不能通过 `evaluate.py` 独立复算；混淆矩阵、PR 曲线和 F1 曲线也必须在原验证集恢复后重新生成。
+本次完成部署、导出和少量真实图片接口冒烟，未开启新训练，也未运行完整独立复评。下方 Precision、Recall 和 mAP 来自最佳检查点与同轮 `results.csv`，不是接口冒烟的精度。训练目录自带曲线；独立验证/测试指标应通过 `evaluate.py` 另行生成。
 
 ## 模型身份
 
 | 项目 | 值 |
 |---|---|
 | PyTorch 权重 | `runs/detect/best.pt` |
-| PyTorch SHA-256 | `c6b6ba26110d9257f5f3b9a0fa04800030a25a9ff2198b7b051a99597bfb0535` |
+| PyTorch SHA-256 | `23c55915874f10d9ba462cf030fc97f4495daf5e43e438a1e1a5f47dde531099` |
 | ONNX 权重 | `runs/detect/best.onnx` |
-| ONNX SHA-256 | `d5bd6032be1bb9f0be979e92b30718670c0b282bf701e21d0f58e50948678a17` |
+| ONNX SHA-256 | `33938785862176b20ef6a0e5737cf1e62972d4c8582990f12f4b8a6f615349d0` |
 | Ultralytics | `8.4.21` |
 | 结构 | YOLOv8s，Backbone 含 2 个 C2fPSA 模块 |
-| 参数量 | 9,915,906（融合后 9,904,226） |
+| 参数量 | 9,917,454（融合后 9,905,774） |
 | 输入尺寸 | 动态高度和宽度；当前使用 512、640、896 三档 |
-| 类别数 | 6 |
-| 数据版本 | 不可用，原始数据集未随仓库提供 |
+| 类别数 | 10；ONNX 输出通道 14=4 框坐标+10 类分数 |
+| 数据版本 | `wood-defect-10class` / `2026-09-27-v1`（6119 张/17780 框） |
+| 训练源 | `runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt` |
+| 发布快照 | `runs/deploy/wood10-e161-20260927` |
+| 旧版备份 | `runs/deploy/legacy6-before-wood10-20260927`（本地备份，保留 PT/ONNX/清单） |
 
 类别顺序是模型接口的一部分，模型元数据、数据 YAML 和前端必须保持一致：
 
@@ -29,33 +32,39 @@
 4. `small_knot`（小节）
 5. `split`（裂纹）
 6. `wave`（波纹）
+7. `decay`（腐朽/腐烂）
+8. `large_hole`（大型空洞/树洞）
+9. `bark_pocket`（树皮脱落/夹皮）
+10. `stain`（颜色异常/污渍）
 
-在线推理服务还可能返回 `suspected_anomaly`。它不是模型类别，而是首轮及切片结果覆盖不足时，对木材图片内部明显暗部或空洞给出的人工复核候选；其数值为候选强度，不能作为模型置信度，也不能纳入本模型的 Precision、Recall 或 mAP 计算。当前六类权重没有“腐朽/空洞”类别。
+新推理不再返回 `suspected_anomaly`。在自适应/精细模式整图或切片结果为空、或仅命中边缘时，暗部规则只定位内部复查区域；模型对带上下文的区域裁剪重新推理，按最高概率类别输出，使用原始模型置信度而非暗部强度。普通检测仍按用户阈值过滤，兜底复查不受该阈值限制；区域框来自规则，类别和置信度来自模型。非木色图、无合格区域或无有效模型输出时不强行生成缺陷；快速模式不启用此兜底。低置信结果继续入人工复核队列，误报可能增多，不能把强制归类解释为精度提升。历史异常记录保留，需要重新识别才会更新。
+
+服务启动时检查类别数量和顺序，误挂旧 6 类权重会明确报错；读取 ONNX 类别前也遵守配置设备，避免 CPU 配置误初始化 GPU 后端。默认模型路径不再依赖启动目录。GPU 容器基础镜像升级为 PyTorch 2.9.1/CUDA 13，以适配 RTX 50 系列；本机实测环境为 PyTorch 2.13.0+cu130 与 RTX 5070 Laptop GPU。
 
 ## 权重内保存的训练配置
 
-权重记录的主要参数为：500 epochs、batch 32、imgsz 896、AdamW、lr0 0.001、lrf 0.01、weight decay 0.0005、warmup 5、cosine LR、patience 50、close mosaic 15、seed 0。统一配置见 `configs/train.yaml`，网络结构见 `configs/yolov8s-c2fpsa.yaml`。
+本次训练 `args.yaml` 记录：最多 300 epochs、自动 batch（-1）、imgsz 896、AdamW、patience 30、cosine LR、close mosaic 15、seed 0、AMP、device 0、workers 4、pretrained false。网络结构见 `configs/yolov8s-c2fpsa-10class.yaml`；实际运行参数以训练目录的 `args.yaml` 为准。
 
-训练历史共保存 431 个 epoch，说明训练在配置的 500 epoch 之前停止。检查点被剥离后 `epoch` 字段为 -1，不能据此判断最佳 epoch；完整逐轮序列仍在检查点的 `train_results` 字段中。
+逐轮 CSV 共 162 轮，最佳检查点内部 `epoch=160`（零起点，即第 161 轮），验证 mAP50–95=0.51083；第 162 轮为 0.50974。原训练目录和 `last.pt` 未修改，可继续用于恢复训练。
 
 ## 指标口径
 
 | 指标 | 权重内历史值 | 独立复评状态 |
 |---|---:|---|
-| Precision | 0.95374 | 待原验证集恢复 |
-| Recall | 0.89180 | 待原验证集恢复 |
-| mAP50 | 0.95145 | 待原验证集恢复 |
-| mAP50-95 | 0.75373 | 待原验证集恢复 |
+| Precision | 0.81052 | 待完整独立复评 |
+| Recall | 0.68211 | 待完整独立复评 |
+| mAP50 | 0.72899 | 待完整独立复评 |
+| mAP50-95 | 0.51083 | 待完整独立复评 |
 
-这些值来自 `best.pt` 的 `train_metrics`，不是本次重新运行 `evaluate.py` 得到的结果。论文和演示材料在数据集恢复前应使用相同数值并明确标注“检查点记录值”，不能把不一致的 0.9425 或 0.955 当作 mAP50。
+这些值来自新 `best.pt` 的 `train_metrics`，并与 CSV 第 161 轮一致。原 6 类模型历史 mAP50=0.95145、mAP50–95=0.75373 只适用于旧模型与旧评估范围，不能用来宣称新 10 类模型的指标，也不能直接比较两套不同类别/数据集的精度。
 
 ## Wise-IoU 核实结果
 
 当前仓库没有 Wise-IoU/WIoU 源码、损失配置或训练参数，检查点模块和训练参数中也没有相应记录。现有 Ultralytics 检测损失使用 BCE 分类损失、CIoU 边框回归损失和 DFL。因而不能声称最终模型使用了 Wise-IoU，也不能声称它带来了指标提升。论文已改为只描述有代码和权重证据支持的 C2fPSA 改进。
 
-## CPU 推理烟雾基准
+## 旧版 6 类 CPU 推理烟雾基准（仅保留历史）
 
-2026-09-25 在 Docker Linux、Intel Core i9-14900HX、单张论文内嵌木材缺陷样本、896×896、1 次预热和 3 次计时条件下，对当前动态 ONNX 重新测试：
+2026-09-25 在 Docker Linux、Intel Core i9-14900HX、单张论文内嵌木材缺陷样本、896×896、1 次预热和 3 次计时条件下，对旧 6 类动态 ONNX 测试（不是新版性能）：
 
 | 格式 | 平均延迟 | 中位延迟 | 吞吐量 |
 |---|---:|---:|---:|
@@ -66,23 +75,31 @@
 
 ## 可复现命令
 
+### 本次部署验证
+
+Python 单测 15/15、后端单测 15/15、前端单测 6/6、前端生产构建及 CPU/GPU Compose 配置检查通过。在本机 RTX 5070 Laptop GPU 上用 PyTorch FP16、在 CPU 上用 ONNX FP32，分别通过 `/health` 和 `/predict` 的 FastAPI 测试客户端完成四个新增类别的真实标注验证图片、三种推理模式、暗部兜底及错误参数检查。某些真实样本快速模式没有检出；冒烟只证明推理链路与类别契约可用，不是逐类召回率验收。
+
+部署记录见 `../deploy/model-release-20260927.json`（相对本目录）。初次替换后完成 PyTorch GPU 与 ONNX CPU 接口冒烟；随后推理优化完成 CPU Compose 四服务、网页上传、批次、详情、历史结果及九组模式/阈值请求验收，详见 `../deploy/inference-final-optimization-20260927.md`。本次 GitHub 运行版不提交验证用图片、数据集及本地原始实验输出。
+
+### 训练、评估与导出
+
 在 `程序源码/ultralytics-main` 目录执行：
 
 ```bash
-python train.py --config configs/train.yaml
-python evaluate.py --model runs/detect/best.pt --data yolo-bvn.yaml
-python export_onnx.py --model runs/detect/best.pt --imgsz 896 --opset 17
-python benchmark.py --models runs/detect/best.pt runs/detect/best.onnx --source path/to/images --device cpu
+python train.py --config configs/train-10class.yaml
+python evaluate.py --model runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt --data yolo-bvn-10class.yaml
+python export_onnx.py --model runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt --imgsz 896 --opset 17 --dynamic
+python benchmark.py --models runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.pt runs/detect/wood-yolov8s-c2fpsa-10class/weights/best.onnx --source path/to/images --device cpu
 ```
 
 GPU 推理保留 `best.pt`，设置 `MODEL_DEVICE=0`；默认 CPU Compose 使用 `best.onnx` 和 ONNX Runtime。
 
 ## 尚未完成的科学验收
 
-原 6 类数据和 12 类扩展数据已恢复，仍必须执行以下科学验收：
+原 6 类数据和正式 10 类扩展数据已就绪，仍必须执行以下科学验收：
 
-1. 为本地大文件归档补充不可变归档哈希；当前版本和来源已登记在 `configs/dataset-version.yaml`。
-2. 训练新的 12 类权重，并运行 `evaluate.py` 生成 `evaluation.json`、混淆矩阵、PR 曲线和 F1 曲线。
-3. 将重新计算的 6 类指标与检查点记录值核对；不一致时以可复评结果为准。
-4. 补充霉变、虫蛀的同域强标注验证样本后，再发布 12 类精度结论。
+1. 固化本地数据版本与来源标识；当前信息已登记在 `configs/dataset-version.yaml`，训练图片和标注不随 GitHub 运行版发布。
+2. 新 10 类训练和默认模型替换已完成；仍需运行 `evaluate.py` 生成完整独立评估的 `evaluation.json`、混淆矩阵、PR 曲线和 F1 曲线。
+3. 将重新计算的 10 类指标与新检查点记录值核对；不一致时以可复评结果为准。
+4. 虫蛀和霉变已从正式类别中移除；只有补足同域强标注和独立评估集后，才能另行恢复并发布相关精度结论。
 5. 更新论文和答辩材料中的表格、图和指标口径。

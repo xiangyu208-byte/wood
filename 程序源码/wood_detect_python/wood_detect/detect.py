@@ -10,6 +10,7 @@ import cv2
 import torch
 import os
 import logging
+from uuid import uuid4
 
 from inference_pipeline import (
     AUTO_CONFIDENCE_THRESHOLD,
@@ -17,9 +18,12 @@ from inference_pipeline import (
     AUTO_PIXEL_COUNT,
     NMS_IOU_THRESHOLD,
     TILE_IMAGE_SIZE,
+    TILE_WINDOW_SIZE,
+    MAX_TILE_COUNT,
+    ENHANCED_REVIEW_ENABLED,
+    CRACK_TRACE_ENABLED,
     TILE_OVERLAP,
-    SUSPECTED_ANOMALY_CLASS_ID,
-    SUSPECTED_ANOMALY_CLASS_NAME,
+    MODEL_CLASS_NAMES,
     Detection,
     run_inference,
 )
@@ -33,8 +37,9 @@ app = FastAPI(title="Wood Defect Detection Service")
 
 # =========================
 # 2. 配置区域（Docker 和本地开发均通过环境变量覆盖）
-MODEL_PATH = Path(os.getenv("MODEL_PATH", "../../ultralytics-main/runs/detect/best.pt")).expanduser().resolve()
-UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", "../../data/uploads")).expanduser().resolve()
+SERVICE_ROOT = Path(__file__).resolve().parent
+MODEL_PATH = Path(os.getenv("MODEL_PATH", str(SERVICE_ROOT / "../../ultralytics-main/runs/detect/best.pt"))).expanduser().resolve()
+UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", str(SERVICE_ROOT / "../../data/uploads"))).expanduser().resolve()
 ACCESS_URL_PREFIX = os.getenv("ACCESS_URL_PREFIX", "/static/")
 MODEL_DEVICE = os.getenv("MODEL_DEVICE", "auto").strip().lower()
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.25"))
@@ -63,9 +68,13 @@ def file_sha256(path: Path) -> str:
 
 MODEL_SHA256 = file_sha256(MODEL_PATH)
 configured_model_version = os.getenv("MODEL_VERSION", "").strip()
-MODEL_VERSION = configured_model_version or f"{MODEL_PATH.stem}-{MODEL_SHA256[:12]}"
+MODEL_VERSION = f"{configured_model_version or f'{MODEL_PATH.stem}-{MODEL_SHA256[:12]}'}-mv1"
 
 model = YOLO(str(MODEL_PATH))
+# Reading ONNX names lazily initializes its backend. Respect the configured
+# device before that happens, otherwise a CUDA-capable host may auto-install GPU
+# Runtime even when the service was explicitly configured for CPU.
+model.overrides["device"] = (0 if torch.cuda.is_available() else "cpu") if MODEL_DEVICE == "auto" else MODEL_DEVICE
 inference_gate = InferenceGate(MAX_CONCURRENT_INFERENCES, INFERENCE_ACQUIRE_TIMEOUT_SECONDS)
 
 
@@ -74,6 +83,11 @@ def normalize_model_names(names: Mapping[int | str, str] | List[str]) -> dict[in
     if isinstance(names, Mapping):
         return {int(class_id): str(name) for class_id, name in names.items()}
     return {class_id: str(name) for class_id, name in enumerate(names)}
+
+
+MODEL_NAMES = normalize_model_names(model.names)
+if MODEL_NAMES != dict(enumerate(MODEL_CLASS_NAMES)):
+    raise RuntimeError("部署模型必须包含按正式顺序排列的 10 类木材缺陷，请检查 MODEL_PATH")
 
 
 # =========================
@@ -152,11 +166,8 @@ async def unhandled_exception_handler(_: Request, exc: Exception):
 # 5. 工具函数
 # =========================
 def build_result_filename(image_path: Path) -> str:
-    """
-    保持结果图文件名与原图一致
-    例如 abc.jpg -> abc.jpg
-    """
-    return image_path.name
+    """Keep each inference artifact immutable and avoid stale browser caches."""
+    return f"{image_path.stem}_{uuid4().hex}{image_path.suffix.lower()}"
 
 
 def build_result_image_url(filename: str) -> str:
@@ -196,10 +207,6 @@ def resolve_half_precision(precision: str, device: Union[int, str]) -> bool:
 # =========================
 @app.get("/health")
 def health():
-    try:
-        class_names = normalize_model_names(model.names)
-    except (AttributeError, TypeError, ValueError):
-        class_names = {}
     return {
         "success": True,
         "message": "Python detection service is running",
@@ -208,13 +215,20 @@ def health():
         "modelSha256": MODEL_SHA256,
         "device": str(resolve_device()),
         "backend": MODEL_PATH.suffix.lower().lstrip("."),
-        "classNames": class_names,
+        "classNames": MODEL_NAMES,
+        "classCount": len(MODEL_CLASS_NAMES),
+        "candidatePolicy": "thresholded_model_boxes_with_local_review",
+        "inferencePipelineVersion": "multiview-20260927",
         "concurrency": {
             "maxConcurrentInferences": MAX_CONCURRENT_INFERENCES,
             "acquireTimeoutSeconds": INFERENCE_ACQUIRE_TIMEOUT_SECONDS,
         },
         "adaptiveInference": {
             "tileSize": TILE_IMAGE_SIZE,
+            "tileWindowSize": TILE_WINDOW_SIZE,
+            "maxTileCountPerView": MAX_TILE_COUNT,
+            "enhancedReviewEnabled": ENHANCED_REVIEW_ENABLED,
+            "crackTraceEnabled": CRACK_TRACE_ENABLED,
             "tileOverlap": TILE_OVERLAP,
             "nmsIouThreshold": NMS_IOU_THRESHOLD,
             "autoMaxDimension": AUTO_MAX_DIMENSION,
@@ -257,6 +271,8 @@ def run_prediction(req: PredictRequest, image_path: Path) -> PredictResponse:
                 source=region,
                 save=False,
                 conf=req.confidenceThreshold,
+                max_det=300,
+                agnostic_nms=False,
                 imgsz=image_size,
                 device=device,
                 half=resolve_half_precision(req.precision, device),
@@ -284,17 +300,18 @@ def run_prediction(req: PredictRequest, image_path: Path) -> PredictResponse:
                     )
             return detections, normalize_model_names(result.names)
 
-        outcome = run_inference(image, req.modelMode, predict_region, IMAGE_SIZE)
+        outcome = run_inference(
+            image, req.modelMode, predict_region, IMAGE_SIZE,
+            classify_candidate=predict_region,
+            confidence_threshold=req.confidenceThreshold,
+        )
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("模型推理失败, image=%s", image_path.name)
         raise HTTPException(status_code=500, detail="模型推理失败") from exc
 
-    class_names = {
-        **normalize_model_names(model.names),
-        SUSPECTED_ANOMALY_CLASS_ID: SUSPECTED_ANOMALY_CLASS_NAME,
-    }
+    class_names = MODEL_NAMES
 
     # 4. 提取检测框明细
     details = []
@@ -326,7 +343,7 @@ def run_prediction(req: PredictRequest, image_path: Path) -> PredictResponse:
         success=True,
         resultImagePath=str(result_image_path).replace("\\", "/"),
         resultImageUrl=build_result_image_url(result_filename),
-        totalCount=sum(item.class_id != SUSPECTED_ANOMALY_CLASS_ID for item in outcome.detections),
+        totalCount=len(outcome.detections),
         modelVersion=MODEL_VERSION,
         actualMode=outcome.actual_mode,
         decisionReason=outcome.decision_reason,
