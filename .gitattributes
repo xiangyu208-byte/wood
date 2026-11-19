@@ -1,6 +1,11 @@
+# 正式 10 类图片与可追溯的 12 类来源快照均使用 Git LFS；标签和配置由普通 Git 跟踪。
+datasets/wood_defect_10class/images/** filter=lfs diff=lfs merge=lfs -text
+datasets/wood_defect_12class/images/** filter=lfs diff=lfs merge=lfs -text
+
 * text=auto
 *.sh text eol=lf
 *.ps1 text eol=crlf
+*.cmd text eol=crlf
 *.pt binary
 *.onnx binary
 *.jpg binary

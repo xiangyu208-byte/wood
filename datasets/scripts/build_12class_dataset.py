@@ -1,8 +1,8 @@
 """Assemble the reviewed 12-class YOLO dataset from local source caches.
 
 No pith/marrow annotation is imported.  Pixel masks are converted to bounding
-boxes.  Reviewed Openverse images are weakly annotated and restricted to the
-training split; their provenance remains in ``metadata/images.jsonl``.
+boxes.  Manually reviewed public images use explicit per-image boxes; their
+provenance remains in ``metadata/images.jsonl``.
 """
 
 from __future__ import annotations
@@ -56,7 +56,9 @@ VSB_TRIGGER = {"Knot_missing", "Blue_Stain", "Quartzity"}
 # Two visually unambiguous mold close-ups are reserved only to make class 9
 # observable in validation/test.  They remain explicitly tagged as weak labels.
 OPENVERSE_SPLIT_OVERRIDES = {
-    "d2e9d61d-3d75-44b1-ac5b-5868a83c0e9e": "val",
+    "18ae8242-9329-4dae-9bde-57aee608ee4a": "val",
+    "94f23c99-f7bd-485f-b2e9-57fa0fee1b34": "test",
+    "44c39968-e098-4398-9dd9-c4478b45b072": "val",
     "14782ce5-ceca-4e92-bbdb-1bb97fdffff9": "test",
 }
 
@@ -81,6 +83,11 @@ SOURCES = {
         "license": "CC BY-NC 4.0",
         "annotation": "BlackRot/YellowRot masks converted to boxes",
     },
+    "wsad": {
+        "url": "https://github.com/bangling-v50/WSAD",
+        "license": "CC BY-NC 4.0",
+        "annotation": "expert-corrected LX anomaly masks converted to boxes",
+    },
     "mvtec_hole": {
         "url": "https://www.mvtec.com/research-teaching/datasets/mvtec-ad",
         "license": "CC BY-NC-SA 4.0",
@@ -94,12 +101,12 @@ SOURCES = {
     "wikimedia": {
         "url": "https://commons.wikimedia.org/",
         "license": "per-image Creative Commons/Public Domain; see images.jsonl",
-        "annotation": "visually reviewed weak full-image boxes; train only",
+        "annotation": "manually reviewed bounding boxes; train only",
     },
     "openverse": {
         "url": "https://openverse.org/",
         "license": "per-image CC0/PDM/CC BY; see images.jsonl",
-        "annotation": "reviewed weak full-image boxes; two mold audit images are reserved for val/test",
+        "annotation": "manually reviewed bounding boxes; reviewed mold images may be reserved for val/test",
     },
 }
 
@@ -142,6 +149,18 @@ def normalise_box(box: tuple[float, float, float, float], width: int, height: in
     return ((x + w / 2) / width, (y + h / 2) / height, w / width, h / height)
 
 
+def clip_yolo_box(box: tuple[float, float, float, float]) -> tuple[float, ...] | None:
+    """Clip a YOLO box to the image frame instead of emitting invalid edges."""
+    cx, cy, width, height = box
+    x1 = max(0.0, cx - width / 2)
+    y1 = max(0.0, cy - height / 2)
+    x2 = min(1.0, cx + width / 2)
+    y2 = min(1.0, cy + height / 2)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return ((x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1)
+
+
 def boxes_from_mask(mask: np.ndarray, *, min_fraction: float = 0.0002) -> list[tuple[float, ...]]:
     binary = (mask > 0).astype(np.uint8)
     height, width = binary.shape[:2]
@@ -171,6 +190,13 @@ def write_sample(
     source_ref: str,
     extra: dict | None = None,
 ) -> None:
+    clipped_labels = [
+        (class_id, clipped)
+        for class_id, box in labels
+        if (clipped := clip_yolo_box(box)) is not None
+    ]
+    if not clipped_labels:
+        raise ValueError(f"sample {stem} has no valid boxes after clipping")
     destination_image = image_dir(split) / f"{stem}.jpg"
     destination_label = label_dir(split) / f"{stem}.txt"
     if isinstance(image, bytes):
@@ -182,7 +208,7 @@ def write_sample(
     destination_label.write_text(
         "".join(
             f"{class_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n"
-            for class_id, (cx, cy, w, h) in labels
+            for class_id, (cx, cy, w, h) in clipped_labels
         ),
         encoding="utf-8",
     )
@@ -192,8 +218,8 @@ def write_sample(
         "source": source,
         "source_ref": source_ref,
         "annotation_quality": quality,
-        "classes": sorted({class_id for class_id, _ in labels}),
-        "objects": len(labels),
+        "classes": sorted({class_id for class_id, _ in clipped_labels}),
+        "objects": len(clipped_labels),
     }
     if extra:
         record.update(extra)
@@ -240,9 +266,21 @@ def add_zenodo6(records: list[dict]) -> None:
 
 
 def add_vsb(records: list[dict]) -> None:
-    parquet_files = sorted(ROOT.glob("**/hf-vsb-tuo/_parquet_cache/*.parquet"))
-    if len(parquet_files) != 5:
-        raise FileNotFoundError(f"expected 5 VSB parquet shards, found {len(parquet_files)}")
+    cache_candidates = []
+    for cache_dir in ROOT.glob("**/hf-vsb-tuo/_parquet_cache"):
+        files = sorted(cache_dir.glob("*.parquet"))
+        if files:
+            cache_candidates.append((cache_dir, files))
+    complete = [(path, files) for path, files in cache_candidates if len(files) == 5]
+    if not complete:
+        found = {str(path): len(files) for path, files in cache_candidates}
+        raise FileNotFoundError(f"expected one complete 5-shard VSB cache, found {found}")
+    # Prefer the complete cache with the largest total size; this avoids mixing
+    # a stray single-shard cache with the canonical five-shard mirror.
+    _, parquet_files = max(
+        complete,
+        key=lambda item: sum(path.stat().st_size for path in item[1]),
+    )
     seen: set[int] = set()
     for parquet_file in parquet_files:
         table = pq.read_table(parquet_file)
@@ -343,6 +381,35 @@ def add_oak_rot(records: list[dict]) -> None:
         )
 
 
+def add_wsad_decay(records: list[dict]) -> None:
+    root = ROOT / "raw" / "wsad" / "data"
+    image_root = root / "test" / "LX"
+    mask_root = root / "ground_truth" / "LX"
+    image_paths = sorted(image_root.glob("*.jpg"))
+    if len(image_paths) != 12:
+        raise FileNotFoundError(f"expected 12 WSAD LX images, found {len(image_paths)}")
+    split_by_index = {10: "val", 11: "test"}
+    for index, image_path in enumerate(image_paths):
+        mask_path = mask_root / f"{image_path.stem}_mask.png"
+        if not mask_path.exists():
+            raise FileNotFoundError(mask_path)
+        mask = np.array(Image.open(mask_path).convert("L"))
+        boxes = boxes_from_mask(mask, min_fraction=0.0001)
+        if not boxes:
+            raise ValueError(f"empty WSAD mask: {mask_path}")
+        write_sample(
+            split=split_by_index.get(index, "train"),
+            stem=f"wsad_decay_{image_path.stem}",
+            image=Image.open(image_path),
+            labels=[(6, box) for box in boxes],
+            source="wsad",
+            quality="strong-expert-mask-derived",
+            records=records,
+            source_ref=f"data/test/LX/{image_path.name}",
+            extra={"source_group": f"wsad:LX:{image_path.stem}"},
+        )
+
+
 def add_mvtec_holes(records: list[dict]) -> None:
     root = ROOT / "raw" / "hf-mvtec-wood-hole"
     for image_path in sorted((root / "image").glob("*.png")):
@@ -353,9 +420,8 @@ def add_mvtec_holes(records: list[dict]) -> None:
         boxes = boxes_from_mask(mask, min_fraction=0.00002)
         if not boxes:
             continue
-        split = stable_split(f"mvtec-hole:{image_path.stem}")
         write_sample(
-            split=split,
+            split="train",
             stem=f"mvtec_hole_{image_path.stem}",
             image=Image.open(image_path),
             labels=[(8, box) for box in boxes],
@@ -374,7 +440,7 @@ def add_tree_cavity(records: list[dict]) -> None:
         if not image_path.exists():
             raise FileNotFoundError(image_path)
         write_sample(
-            split=OPENVERSE_SPLIT_OVERRIDES.get(item_id, "train"),
+            split="train",
             stem=f"tree_cavity_{image_path.stem}",
             image=Image.open(image_path),
             labels=[(7, (0.5, 0.5, 0.98, 0.98))],
@@ -389,6 +455,9 @@ def add_wikimedia(records: list[dict]) -> None:
     metadata_root = ROOT / "metadata"
     candidates = json.loads((metadata_root / "wikimedia_candidates.json").read_text(encoding="utf-8"))
     accepted = json.loads((metadata_root / "wikimedia_accept.json").read_text(encoding="utf-8"))
+    reviewed = json.loads((metadata_root / "manual_boxes.json").read_text(encoding="utf-8"))[
+        "wikimedia"
+    ]
     accepted_lookup = {
         int(page_id): class_name for class_name, page_ids in accepted.items() for page_id in page_ids
     }
@@ -396,16 +465,19 @@ def add_wikimedia(records: list[dict]) -> None:
     missing = sorted(set(accepted_lookup) - set(by_id))
     if missing:
         raise ValueError(f"accepted Wikimedia page ids missing from candidate manifest: {missing}")
-    class_ids = {"decay": 6, "insect_damage": 8}
+    class_ids = {"decay": 6, "insect_damage": 8, "mold": 9}
     for page_id, class_name in sorted(accepted_lookup.items()):
         item = by_id[page_id]
+        review = reviewed.get(str(page_id))
+        if not review or review.get("class") != class_name or not review.get("boxes"):
+            raise ValueError(f"missing/invalid manual boxes for Wikimedia page {page_id}")
         write_sample(
             split="train",
             stem=f"wikimedia_{class_name}_{page_id}",
             image=Image.open(item["local_path"]),
-            labels=[(class_ids[class_name], (0.5, 0.5, 0.98, 0.98))],
+            labels=[(class_ids[class_name], tuple(map(float, box))) for box in review["boxes"]],
             source="wikimedia",
-            quality="weak-reviewed-full-image",
+            quality="strong-manual-box",
             records=records,
             source_ref=item["description_url"],
             extra={
@@ -422,6 +494,9 @@ def add_openverse(records: list[dict]) -> None:
     metadata_root = ROOT / "metadata"
     candidates = json.loads((metadata_root / "openverse_candidates.json").read_text(encoding="utf-8"))
     accepted = json.loads((metadata_root / "openverse_accept.json").read_text(encoding="utf-8"))
+    reviewed = json.loads((metadata_root / "manual_boxes.json").read_text(encoding="utf-8"))[
+        "openverse"
+    ]
     accepted_lookup = {
         item_id: class_name for class_name, ids in accepted.items() for item_id in ids
     }
@@ -433,13 +508,16 @@ def add_openverse(records: list[dict]) -> None:
     for item_id, class_name in sorted(accepted_lookup.items()):
         item = by_id[item_id]
         image_path = Path(item["local_path"])
+        review = reviewed.get(item_id)
+        if not review or review.get("class") != class_name or not review.get("boxes"):
+            raise ValueError(f"missing/invalid manual boxes for Openverse id {item_id}")
         write_sample(
-            split="train",
+            split=OPENVERSE_SPLIT_OVERRIDES.get(item_id, "train"),
             stem=f"openverse_{class_name}_{item_id[:12]}",
             image=Image.open(image_path),
-            labels=[(class_ids[class_name], (0.5, 0.5, 0.98, 0.98))],
+            labels=[(class_ids[class_name], tuple(map(float, box))) for box in review["boxes"]],
             source="openverse",
-            quality="weak-reviewed-full-image",
+            quality="strong-manual-box",
             records=records,
             source_ref=item["foreign_landing_url"],
             extra={
@@ -524,7 +602,15 @@ def validate(records: list[dict]) -> dict:
                 coords = list(map(float, values[1:]))
                 if not 0 <= class_id < len(CLASSES):
                     issues.append(f"bad class: {image_path.stem}:{line_number}")
-                if not all(0 < value <= 1 for value in coords[2:]) or not all(0 <= value <= 1 for value in coords[:2]):
+                cx, cy, width, height = coords
+                if (
+                    width <= 0
+                    or height <= 0
+                    or cx - width / 2 < -1e-6
+                    or cy - height / 2 < -1e-6
+                    or cx + width / 2 > 1 + 1e-6
+                    or cy + height / 2 > 1 + 1e-6
+                ):
                     issues.append(f"bad box: {image_path.stem}:{line_number}")
                 object_counts[class_id] += 1
                 found_classes.add(class_id)
@@ -612,6 +698,7 @@ def main() -> None:
         ("VSB holes/stains", add_vsb),
         ("spruce bark loss", add_spruce_bark),
         ("oak rot", add_oak_rot),
+        ("WSAD expert decay masks", add_wsad_decay),
         ("MVTec hole proxy", add_mvtec_holes),
         ("reviewed tree cavities", add_tree_cavity),
         ("reviewed Wikimedia defects", add_wikimedia),

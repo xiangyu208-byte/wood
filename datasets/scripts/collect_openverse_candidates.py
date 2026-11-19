@@ -34,21 +34,40 @@ QUERIES = {
     ],
     "insect_damage": [
         "woodworm holes wood",
+        "woodworm damage close up",
+        "powderpost beetle holes wood",
+        "powder post beetle damage lumber",
         "wood borer damage",
+        "wood borer exit holes timber",
         "termite damage wood",
+        "termite damaged lumber close up",
+        "carpenter bee holes wood",
         "bark beetle galleries wood",
+        "bark beetle gallery dead wood",
         "insect damaged timber",
     ],
     "mold": [
         "moldy wood grain",
         "mold growth on wood",
         "mildew wooden surface",
+        "mildew on wooden furniture",
         "black mold wood",
+        "black mold wooden board",
+        "black mould timber",
         "fungal mold timber surface",
         "mold on a cedar stump",
         "white mold on wood",
         "mildew wood texture",
         "moldy lumber",
+        "moldy plywood",
+        "mould on wooden beam",
+        "mold on wooden wall",
+        "mold damaged plywood",
+        "moldy timber board",
+        "wood surface mould",
+        "wooden board black mold",
+        "mold on wood panel",
+        "mildew wood board close up",
     ],
 }
 
@@ -64,7 +83,7 @@ POSITIVE = {
         "gallery",
         "galleries",
     ),
-    "mold": ("mold", "mould", "mildew", "fungal", "fungus"),
+    "mold": ("mold", "mould", "mildew"),
 }
 WOOD = ("wood", "wooden", "timber", "lumber", "beam", "log", "bark", "tree", "trunk")
 NEGATIVE = (
@@ -80,6 +99,11 @@ NEGATIVE = (
     "manuscript",
     "painting",
     "insect specimen",
+    "slime mold",
+    "slime mould",
+    "lichen",
+    "mushroom",
+    "moulding",
 )
 
 
@@ -140,20 +164,30 @@ def make_sheet(class_name: str, records: list[dict]) -> None:
     print(f"[{class_name}] contact sheet: {path}")
 
 
-def collect(class_name: str, limit: int) -> list[dict]:
+def collect(class_name: str, limit: int, pages: int) -> list[dict]:
     by_id: dict[str, dict] = {}
     for query in QUERIES[class_name]:
         # Anonymous Openverse clients are limited to 20 records per request.
-        params = urlencode({"q": query, "page_size": 20, "license": "cc0,by,pdm"})
-        payload = fetch_json(f"{API}?{params}")
-        for item in payload.get("results", []):
-            item["query"] = query
-            item["score"] = relevance(class_name, item)
-            if item["score"] >= 7 and item.get("url"):
-                current = by_id.get(item["id"])
-                if current is None or item["score"] > current["score"]:
-                    by_id[item["id"]] = item
-        time.sleep(0.15)
+        for page in range(1, pages + 1):
+            params = urlencode(
+                {
+                    "q": query,
+                    "page_size": 20,
+                    "page": page,
+                    "license": "cc0,by,by-sa,pdm",
+                }
+            )
+            payload = fetch_json(f"{API}?{params}")
+            for item in payload.get("results", []):
+                item["query"] = query
+                item["score"] = relevance(class_name, item)
+                if item["score"] >= 7 and item.get("url"):
+                    current = by_id.get(item["id"])
+                    if current is None or item["score"] > current["score"]:
+                        by_id[item["id"]] = item
+            if not payload.get("next"):
+                break
+            time.sleep(0.15)
 
     ranked = sorted(by_id.values(), key=lambda item: (-item["score"], item["id"]))
     target_dir = OUT / class_name
@@ -197,6 +231,7 @@ def collect(class_name: str, limit: int) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=32, help="maximum staged candidates per class")
+    parser.add_argument("--pages", type=int, default=4, help="Openverse result pages per query")
     parser.add_argument(
         "--classes",
         nargs="+",
@@ -211,13 +246,25 @@ def main() -> None:
     existing = []
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+    accept_path = META / "openverse_accept.json"
+    accepted_ids: dict[str, set[str]] = {name: set() for name in QUERIES}
+    if accept_path.exists():
+        raw_accept = json.loads(accept_path.read_text(encoding="utf-8"))
+        accepted_ids = {name: set(map(str, raw_accept.get(name, []))) for name in QUERIES}
     manifest: list[dict] = [row for row in existing if row.get("class") not in args.classes]
     for class_name in args.classes:
-        records = collect(class_name, args.limit)
+        records = collect(class_name, args.limit, args.pages)
+        record_ids = {str(row.get("id")) for row in records}
+        records.extend(
+            row
+            for row in existing
+            if row.get("class") == class_name
+            and str(row.get("id")) in accepted_ids[class_name]
+            and str(row.get("id")) not in record_ids
+        )
         manifest.extend(records)
         make_sheet(class_name, records)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    accept_path = META / "openverse_accept.json"
     if not accept_path.exists():
         accept_path.write_text(
             json.dumps({name: [] for name in QUERIES}, ensure_ascii=False, indent=2),

@@ -1,0 +1,222 @@
+{
+  "generated_at": "2026-09-27T02:45:01.749719+00:00",
+  "dataset_root": "E:\\wood\\datasets\\wood_defect_10class",
+  "ok": true,
+  "issues": [],
+  "summary": {
+    "images": 6119,
+    "objects": 17780,
+    "images_by_split": {
+      "train": 4847,
+      "val": 967,
+      "test": 305
+    },
+    "objects_by_split": {
+      "train": 13943,
+      "val": 2626,
+      "test": 1211
+    },
+    "missing_labels": 0,
+    "orphan_labels": 0,
+    "corrupt_images": 0,
+    "invalid_label_lines": 0,
+    "invalid_class_ids": 0,
+    "invalid_boxes": 0,
+    "exact_duplicate_groups": 0,
+    "exact_cross_split_duplicate_groups": 0,
+    "leaking_families": 0,
+    "placeholder_boxes": 22,
+    "placeholder_boxes_in_evaluation": 0,
+    "reviewed_full_image_boxes_in_evaluation": 0,
+    "weak_images_in_evaluation": 0
+  },
+  "class_stats": {
+    "0": {
+      "name": "dry_knot",
+      "images": 1966,
+      "objects": 2562,
+      "images_by_split": {
+        "train": 1549,
+        "val": 320,
+        "test": 97
+      },
+      "objects_by_split": {
+        "train": 1999,
+        "val": 421,
+        "test": 142
+      },
+      "placeholder_boxes": 0
+    },
+    "1": {
+      "name": "sound_knot",
+      "images": 1807,
+      "objects": 2598,
+      "images_by_split": {
+        "train": 1433,
+        "val": 278,
+        "test": 96
+      },
+      "objects_by_split": {
+        "train": 2056,
+        "val": 375,
+        "test": 167
+      },
+      "placeholder_boxes": 0
+    },
+    "2": {
+      "name": "edge_knot",
+      "images": 453,
+      "objects": 497,
+      "images_by_split": {
+        "train": 363,
+        "val": 90,
+        "test": 0
+      },
+      "objects_by_split": {
+        "train": 401,
+        "val": 96,
+        "test": 0
+      },
+      "placeholder_boxes": 0
+    },
+    "3": {
+      "name": "small_knot",
+      "images": 1181,
+      "objects": 1934,
+      "images_by_split": {
+        "train": 982,
+        "val": 199,
+        "test": 0
+      },
+      "objects_by_split": {
+        "train": 1623,
+        "val": 311,
+        "test": 0
+      },
+      "placeholder_boxes": 0
+    },
+    "4": {
+      "name": "split",
+      "images": 980,
+      "objects": 1594,
+      "images_by_split": {
+        "train": 792,
+        "val": 163,
+        "test": 25
+      },
+      "objects_by_split": {
+        "train": 1319,
+        "val": 243,
+        "test": 32
+      },
+      "placeholder_boxes": 0
+    },
+    "5": {
+      "name": "wave",
+      "images": 1584,
+      "objects": 2199,
+      "images_by_split": {
+        "train": 1292,
+        "val": 292,
+        "test": 0
+      },
+      "objects_by_split": {
+        "train": 1795,
+        "val": 404,
+        "test": 0
+      },
+      "placeholder_boxes": 0
+    },
+    "6": {
+      "name": "decay",
+      "images": 372,
+      "objects": 1110,
+      "images_by_split": {
+        "train": 292,
+        "val": 49,
+        "test": 31
+      },
+      "objects_by_split": {
+        "train": 862,
+        "val": 164,
+        "test": 84
+      },
+      "placeholder_boxes": 0
+    },
+    "7": {
+      "name": "large_hole",
+      "images": 500,
+      "objects": 525,
+      "images_by_split": {
+        "train": 389,
+        "val": 71,
+        "test": 40
+      },
+      "objects_by_split": {
+        "train": 403,
+        "val": 76,
+        "test": 46
+      },
+      "placeholder_boxes": 22
+    },
+    "8": {
+      "name": "bark_pocket",
+      "images": 578,
+      "objects": 3590,
+      "images_by_split": {
+        "train": 450,
+        "val": 63,
+        "test": 65
+      },
+      "objects_by_split": {
+        "train": 2696,
+        "val": 403,
+        "test": 491
+      },
+      "placeholder_boxes": 0
+    },
+    "9": {
+      "name": "stain",
+      "images": 923,
+      "objects": 1171,
+      "images_by_split": {
+        "train": 641,
+        "val": 111,
+        "test": 171
+      },
+      "objects_by_split": {
+        "train": 789,
+        "val": 133,
+        "test": 249
+      },
+      "placeholder_boxes": 0
+    }
+  },
+  "source_images_by_split": {
+    "train": {
+      "oak_rot": 282,
+      "spruce_bark": 450,
+      "tree_cavity": 22,
+      "vsb": 988,
+      "wsad": 10,
+      "zenodo": 3095
+    },
+    "val": {
+      "oak_rot": 48,
+      "spruce_bark": 63,
+      "vsb": 177,
+      "wsad": 1,
+      "zenodo": 678
+    },
+    "test": {
+      "oak_rot": 30,
+      "spruce_bark": 65,
+      "vsb": 209,
+      "wsad": 1
+    }
+  },
+  "examples": {
+    "cross_split_duplicates": [],
+    "leaking_families": {}
+  }
+}

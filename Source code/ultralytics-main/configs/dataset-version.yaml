@@ -1,0 +1,36 @@
+dataset:
+  name: wood-defect-10class
+  version: 2026-09-27-v1
+  status: assembled-validated-git-lfs
+  path: ../../../datasets/wood_defect_10class
+  images: 6119
+  objects: 17780
+  train_images: 4847
+  validation_images: 967
+  test_images: 305
+  excludes:
+    - marrow
+    - pith_damage
+    - insect_damage
+    - mold
+  class_names:
+    - dry_knot
+    - sound_knot
+    - edge_knot
+    - small_knot
+    - split
+    - wave
+    - decay
+    - large_hole
+    - bark_pocket
+    - stain
+  validation_report: ../../../datasets/wood_defect_10class/metadata/validation_report.json
+  source_manifest: ../../../datasets/wood_defect_10class/metadata/sources.json
+  annotation_manifest: ../../../datasets/wood_defect_10class/metadata/images.jsonl
+  license: mixed-noncommercial-research
+  license_note: >-
+    The assembled dataset includes CC BY-NC 4.0 Oak data. Replace that source
+    before commercial use.
+  quality_note: >-
+    Insect damage (45 images/70 boxes) and mold (7 images/7 boxes) were removed
+    because they cannot support stable training or trustworthy evaluation.
