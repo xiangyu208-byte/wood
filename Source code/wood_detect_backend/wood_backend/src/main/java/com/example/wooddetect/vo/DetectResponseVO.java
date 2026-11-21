@@ -18,6 +18,7 @@ public class DetectResponseVO {
      * 批量任务编号；单张上传时为空
      */
     private String batchNo;
+    private String materialBatch;
 
     /**
      * 原始文件名

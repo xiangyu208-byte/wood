@@ -9,7 +9,7 @@ pip install -e .
 pip install -r requirements-model.txt
 ```
 
-GPU 训练需要支持 CUDA 的 PyTorch。默认配置读取仓库内的 [十类数据集](../../datasets/README.md)，图片通过 Git LFS 下载。类别顺序见 [yolo-bvn-10class.yaml](yolo-bvn-10class.yaml)。
+GPU 训练需要支持 CUDA 的 PyTorch。自行准备 YOLO 格式的训练、验证与测试图片及对应标注。默认配置读取本地 `../../datasets/wood_defect_10class`。也可复制数据配置模板到本地并设置绝对路径，使用 `python train.py --config configs/train-10class.yaml --data /path/to/data.yaml` 指向自己的数据。类别顺序见 [yolo-bvn-10class.yaml](yolo-bvn-10class.yaml)。
 
 ## 流程
 

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
-  { path: '/boards', name: 'Boards', component: () => import('../views/BoardView.vue') },
+  { path: '/:pathMatch(.*)*', redirect: '/detect' },
   {
     path: '/',
     redirect: '/detect'

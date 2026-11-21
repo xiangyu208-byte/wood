@@ -32,9 +32,10 @@ public class DetectController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "STANDARD") String modelMode,
             @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
-            @RequestParam(defaultValue = "AUTO") String precision) {
+            @RequestParam(defaultValue = "AUTO") String precision,
+            @RequestParam(required = false) String materialBatch) {
         DetectResponseVO vo = detectService.uploadAndDetect(
-                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
+                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision, materialBatch));
         return Result.success("图片上传并识别成功", vo);
     }
 
@@ -46,9 +47,10 @@ public class DetectController {
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(defaultValue = "STANDARD") String modelMode,
             @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
-            @RequestParam(defaultValue = "AUTO") String precision) {
+            @RequestParam(defaultValue = "AUTO") String precision,
+            @RequestParam(required = false) String materialBatch) {
         List<DetectResponseVO> result = detectService.batchUploadAndDetect(
-                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
+                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision, materialBatch));
         return Result.success("批量图片上传并识别成功", result);
     }
 
@@ -60,9 +62,10 @@ public class DetectController {
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(defaultValue = "STANDARD") String modelMode,
             @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
-            @RequestParam(defaultValue = "AUTO") String precision) {
+            @RequestParam(defaultValue = "AUTO") String precision,
+            @RequestParam(required = false) String materialBatch) {
         BatchTaskVO task = detectService.createAsyncBatch(
-                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
+                files, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision, materialBatch));
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(Result.success("批量任务已创建", task));
     }
@@ -96,6 +99,7 @@ public class DetectController {
             @RequestParam(required = false) String imageName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchNo,
+            @RequestParam(required = false) String materialBatch,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String hasDefect,
             @RequestParam(required = false) String qualityGrade,
@@ -108,7 +112,7 @@ public class DetectController {
             @RequestParam(required = false) String endTime
     ) {
         return Result.success(
-                detectService.getHistory(page, size, imageName, status, batchNo, sourceType, hasDefect,
+                detectService.getHistory(page, size, imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                         qualityGrade, minQualityScore, maxQualityScore,
                         modelVersion, reviewStatus, reviewQueue, startTime, endTime)
         );
@@ -148,6 +152,7 @@ public class DetectController {
             @RequestParam(required = false) String imageName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchNo,
+            @RequestParam(required = false) String materialBatch,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String hasDefect,
             @RequestParam(required = false) String qualityGrade,
@@ -159,7 +164,7 @@ public class DetectController {
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime
     ) {
-        detectService.deleteRecordsByCondition(imageName, status, batchNo, sourceType, hasDefect,
+        detectService.deleteRecordsByCondition(imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         return Result.success("已按筛选条件删除全部记录");
@@ -174,6 +179,7 @@ public class DetectController {
             @RequestParam(required = false) String imageName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchNo,
+            @RequestParam(required = false) String materialBatch,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String hasDefect,
             @RequestParam(required = false) String qualityGrade,
@@ -186,7 +192,7 @@ public class DetectController {
             @RequestParam(required = false) String endTime,
             HttpServletResponse response
     ) {
-        detectService.exportHistoryCsv(imageName, status, batchNo, sourceType, hasDefect,
+        detectService.exportHistoryCsv(imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime, response);
     }
@@ -196,6 +202,7 @@ public class DetectController {
             @RequestParam(required = false) String imageName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchNo,
+            @RequestParam(required = false) String materialBatch,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String hasDefect,
             @RequestParam(required = false) String qualityGrade,
@@ -208,7 +215,7 @@ public class DetectController {
             @RequestParam(required = false) String endTime,
             HttpServletResponse response
     ) {
-        detectService.exportHistoryExcel(imageName, status, batchNo, sourceType, hasDefect,
+        detectService.exportHistoryExcel(imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime, response);
     }
@@ -218,9 +225,10 @@ public class DetectController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "STANDARD") String modelMode,
             @RequestParam(defaultValue = "0.25") Double confidenceThreshold,
-            @RequestParam(defaultValue = "AUTO") String precision) {
+            @RequestParam(defaultValue = "AUTO") String precision,
+            @RequestParam(required = false) String materialBatch) {
         DetectResponseVO vo = detectService.cameraUploadAndDetect(
-                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision));
+                file, new DetectionOptionsDTO(modelMode, confidenceThreshold, precision, materialBatch));
         return Result.success("摄像头图片识别成功", vo);
     }
 
@@ -229,6 +237,7 @@ public class DetectController {
             @RequestParam(required = false) String imageName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchNo,
+            @RequestParam(required = false) String materialBatch,
             @RequestParam(required = false) String sourceType,
             @RequestParam(required = false) String hasDefect,
             @RequestParam(required = false) String qualityGrade,
@@ -242,7 +251,7 @@ public class DetectController {
             HttpServletResponse response
     ) {
         detectService.exportHistoryImagesZip(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime, response
         );

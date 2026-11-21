@@ -11,4 +11,9 @@ public class DetectionOptionsDTO {
     private String modelMode;
     private Double confidenceThreshold;
     private String inferencePrecision;
+    private String materialBatch;
+
+    public DetectionOptionsDTO(String modelMode, Double confidenceThreshold, String inferencePrecision) {
+        this(modelMode, confidenceThreshold, inferencePrecision, null);
+    }
 }

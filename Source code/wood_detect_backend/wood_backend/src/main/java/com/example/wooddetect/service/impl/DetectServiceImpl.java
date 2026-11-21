@@ -8,6 +8,7 @@ import com.example.wooddetect.common.InferenceServiceException;
 import com.example.wooddetect.config.FileUploadProperties;
 import com.example.wooddetect.config.ActiveLearningProperties;
 import com.example.wooddetect.dto.DetectionOptionsDTO;
+import com.example.wooddetect.service.MaterialBatchService;
 import com.example.wooddetect.dto.PythonDetectResponseDTO;
 import com.example.wooddetect.entity.DetectBatch;
 import com.example.wooddetect.entity.DetectDetail;
@@ -80,6 +81,7 @@ public class DetectServiceImpl implements DetectService {
     private static final TypeReference<Map<String, Integer>> DEFECT_COUNTS_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<QualityDeductionVO>> QUALITY_DEDUCTIONS_TYPE = new TypeReference<>() {};
 
+    private final MaterialBatchService materialBatches;
     private final DetectRecordMapper detectRecordMapper;
     private final DetectDetailMapper detectDetailMapper;
     private final DetectBatchMapper detectBatchMapper;
@@ -94,6 +96,7 @@ public class DetectServiceImpl implements DetectService {
     private final TaskExecutor detectionTaskExecutor;
 
     public DetectServiceImpl(
+            MaterialBatchService materialBatches,
             DetectRecordMapper detectRecordMapper,
             DetectDetailMapper detectDetailMapper,
             DetectBatchMapper detectBatchMapper,
@@ -107,6 +110,7 @@ public class DetectServiceImpl implements DetectService {
             PlatformTransactionManager transactionManager,
             @Qualifier("detectionTaskExecutor") TaskExecutor detectionTaskExecutor
     ) {
+        this.materialBatches = materialBatches;
         this.detectRecordMapper = detectRecordMapper;
         this.detectDetailMapper = detectDetailMapper;
         this.detectBatchMapper = detectBatchMapper;
@@ -404,7 +408,10 @@ public class DetectServiceImpl implements DetectService {
         record.setReviewStatus("UNREVIEWED");
         record.setCreateTime(now);
         record.setUpdateTime(now);
-        transactionTemplate.executeWithoutResult(transactionStatus -> detectRecordMapper.insert(record));
+        transactionTemplate.executeWithoutResult(transactionStatus -> {
+            record.setMaterialBatch(materialBatches.resolveForCapture(options.getMaterialBatch()));
+            detectRecordMapper.insert(record);
+        });
         if (record.getId() == null) {
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, "创建检测记录失败");
         }
@@ -550,7 +557,7 @@ public class DetectServiceImpl implements DetectService {
 
     @Override
     public PageResultVO<DetectHistoryVO> getHistory(
-            Integer page, Integer size, String imageName, String status, String batchNo,
+            Integer page, Integer size, String imageName, String status, String batchNo, String materialBatch,
             String sourceType, String hasDefect, String qualityGrade,
             Double minQualityScore, Double maxQualityScore, String modelVersion,
             String reviewStatus, String reviewQueue, String startTime, String endTime) {
@@ -561,7 +568,7 @@ public class DetectServiceImpl implements DetectService {
         }
 
         QueryWrapper<DetectRecord> wrapper = buildHistoryQueryWrapper(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         Page<DetectRecord> resultPage = detectRecordMapper.selectPage(new Page<>(safePage, safeSize), wrapper);
@@ -605,11 +612,11 @@ public class DetectServiceImpl implements DetectService {
 
     @Override
     public void deleteRecordsByCondition(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue, String startTime, String endTime) {
         List<DetectRecord> records = listHistoryRecords(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         if (records.isEmpty()) {
@@ -646,12 +653,12 @@ public class DetectServiceImpl implements DetectService {
 
     @Override
     public void exportHistoryCsv(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue,
             String startTime, String endTime, HttpServletResponse response) {
         List<DetectRecord> records = listHistoryRecords(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         response.setContentType("text/csv;charset=UTF-8");
@@ -659,7 +666,7 @@ public class DetectServiceImpl implements DetectService {
         response.setHeader("Content-Disposition", "attachment; filename=detect_history.csv");
         try (PrintWriter writer = response.getWriter()) {
             writer.write('\uFEFF');
-            writer.println("记录ID,批次号,来源类型,图片名称,原图URL,结果图URL,缺陷数,状态,失败原因,请求模式,实际模式,模式原因,推理精度,推理耗时毫秒,推理区域数,图片尺寸,质量分,质量等级,缺陷覆盖率,最大缺陷面积率,各类别数量,扣分明细,评分规则版本,评价说明,模型版本,最低置信度,自动复核标记,复核原因,人工复核状态,复核备注,复核时间,创建时间");
+            writer.println("记录ID,识别任务号,来源类型,图片名称,原图URL,结果图URL,缺陷数,状态,失败原因,请求模式,实际模式,模式原因,推理精度,推理耗时毫秒,推理区域数,图片尺寸,质量分,质量等级,缺陷覆盖率,最大缺陷面积率,各类别数量,扣分明细,评分规则版本,评价说明,模型版本,最低置信度,自动复核标记,复核原因,人工复核状态,复核备注,复核时间,创建时间,板材批次");
             for (DetectRecord record : records) {
                 writer.println(String.join(",", List.of(
                         String.valueOf(record.getId()), safeCsv(record.getBatchNo()), safeCsv(record.getSourceType()),
@@ -677,7 +684,7 @@ public class DetectServiceImpl implements DetectService {
                         safeCsv(record.getReviewReason()), safeCsv(record.getReviewStatus()),
                         safeCsv(record.getReviewComment()),
                         record.getReviewedAt() == null ? "" : record.getReviewedAt().toString(),
-                        record.getCreateTime() == null ? "" : record.getCreateTime().toString()
+                        record.getCreateTime() == null ? "" : record.getCreateTime().toString(), safeCsv(record.getMaterialBatch())
                 )));
             }
         } catch (IOException e) {
@@ -687,19 +694,19 @@ public class DetectServiceImpl implements DetectService {
 
     @Override
     public void exportHistoryExcel(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue,
             String startTime, String endTime, HttpServletResponse response) {
         List<DetectRecord> records = listHistoryRecords(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment; filename=detect_history.xlsx");
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("历史记录");
-            String[] headers = {"记录ID", "批次号", "来源类型", "图片名称", "原图URL", "结果图URL", "缺陷数", "状态", "失败原因", "请求模式", "实际模式", "模式原因", "推理精度", "推理耗时毫秒", "推理区域数", "图片尺寸", "质量分", "质量等级", "缺陷覆盖率", "最大缺陷面积率", "各类别数量", "扣分明细", "评分规则版本", "评价说明", "模型版本", "最低置信度", "自动复核标记", "复核原因", "人工复核状态", "复核备注", "复核时间", "创建时间"};
+            String[] headers = {"记录ID", "识别任务号", "来源类型", "图片名称", "原图URL", "结果图URL", "缺陷数", "状态", "失败原因", "请求模式", "实际模式", "模式原因", "推理精度", "推理耗时毫秒", "推理区域数", "图片尺寸", "质量分", "质量等级", "缺陷覆盖率", "最大缺陷面积率", "各类别数量", "扣分明细", "评分规则版本", "评价说明", "模型版本", "最低置信度", "自动复核标记", "复核原因", "人工复核状态", "复核备注", "复核时间", "创建时间", "板材批次"};
             Row header = sheet.createRow(0);
             for (int i = 0; i < headers.length; i++) {
                 header.createCell(i).setCellValue(headers[i]);
@@ -707,6 +714,7 @@ public class DetectServiceImpl implements DetectService {
             int rowNumber = 1;
             for (DetectRecord record : records) {
                 Row row = sheet.createRow(rowNumber++);
+                row.createCell(32).setCellValue(nullToEmpty(record.getMaterialBatch()));
                 row.createCell(0).setCellValue(record.getId());
                 row.createCell(1).setCellValue(nullToEmpty(record.getBatchNo()));
                 row.createCell(2).setCellValue(nullToEmpty(record.getSourceType()));
@@ -753,12 +761,12 @@ public class DetectServiceImpl implements DetectService {
 
     @Override
     public void exportHistoryImagesZip(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue,
             String startTime, String endTime, HttpServletResponse response) {
         List<DetectRecord> records = listHistoryRecords(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime);
         if (records.isEmpty()) {
@@ -779,17 +787,17 @@ public class DetectServiceImpl implements DetectService {
     }
 
     private List<DetectRecord> listHistoryRecords(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue, String startTime, String endTime) {
         return detectRecordMapper.selectList(buildHistoryQueryWrapper(
-                imageName, status, batchNo, sourceType, hasDefect,
+                imageName, status, batchNo, materialBatch, sourceType, hasDefect,
                 qualityGrade, minQualityScore, maxQualityScore,
                 modelVersion, reviewStatus, reviewQueue, startTime, endTime));
     }
 
     private QueryWrapper<DetectRecord> buildHistoryQueryWrapper(
-            String imageName, String status, String batchNo, String sourceType,
+            String imageName, String status, String batchNo, String materialBatch, String sourceType,
             String hasDefect, String qualityGrade, Double minQualityScore, Double maxQualityScore,
             String modelVersion, String reviewStatus, String reviewQueue, String startTime, String endTime) {
         QueryWrapper<DetectRecord> wrapper = new QueryWrapper<>();
@@ -803,6 +811,7 @@ public class DetectServiceImpl implements DetectService {
             }
             wrapper.eq("status", normalized);
         }
+        if (hasText(materialBatch)) wrapper.eq("material_batch", materialBatch.trim());
         if (hasText(batchNo)) {
             wrapper.like("batch_no", batchNo.trim());
         }
@@ -1002,7 +1011,8 @@ public class DetectServiceImpl implements DetectService {
         if (!Double.isFinite(confidence) || confidence < 0.05 || confidence > 0.95) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "confidenceThreshold 必须在 0.05 到 0.95 之间");
         }
-        return new DetectionOptionsDTO(mode, confidence, precision);
+        String materialBatch = rawOptions == null ? null : materialBatches.resolve(rawOptions.getMaterialBatch());
+        return new DetectionOptionsDTO(mode, confidence, precision, materialBatch);
     }
 
     private DetectionOptionsDTO optionsFromRecord(DetectRecord record) {
@@ -1042,6 +1052,7 @@ public class DetectServiceImpl implements DetectService {
         DetectHistoryVO vo = new DetectHistoryVO();
         vo.setRecordId(record.getId());
         vo.setBatchNo(record.getBatchNo());
+        vo.setMaterialBatch(record.getMaterialBatch());
         vo.setSourceType(record.getSourceType());
         vo.setModelMode(record.getModelMode());
         vo.setActualMode(record.getActualMode());
@@ -1078,6 +1089,7 @@ public class DetectServiceImpl implements DetectService {
         DetectResponseVO vo = new DetectResponseVO();
         vo.setRecordId(record.getId());
         vo.setBatchNo(record.getBatchNo());
+        vo.setMaterialBatch(record.getMaterialBatch());
         vo.setImageName(record.getImageName());
         vo.setImageUrl(record.getImageUrl());
         vo.setResultImageUrl(record.getResultImageUrl());

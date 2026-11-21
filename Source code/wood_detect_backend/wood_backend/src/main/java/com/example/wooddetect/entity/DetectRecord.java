@@ -1,6 +1,8 @@
 package com.example.wooddetect.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -37,6 +39,9 @@ public class DetectRecord {
      * 批量识别批次号
      */
     private String batchNo;
+    // Membership is edited independently from inference and manual review.
+    @TableField(updateStrategy = FieldStrategy.NEVER)
+    private String materialBatch;
 
     /**
      * 识别来源：UPLOAD / CAMERA

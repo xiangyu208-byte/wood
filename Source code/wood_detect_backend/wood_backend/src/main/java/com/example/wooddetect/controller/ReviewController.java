@@ -38,8 +38,9 @@ public class ReviewController {
             @RequestParam(required = false) List<Long> recordIds,
             @RequestParam(required = false) String reviewStatus,
             @RequestParam(required = false) String modelVersion,
+            @RequestParam(required = false) String materialBatch,
             HttpServletResponse response) {
-        reviewService.exportYoloDataset(recordIds, reviewStatus, modelVersion, response);
+        reviewService.exportYoloDataset(recordIds, reviewStatus, modelVersion, materialBatch, response);
     }
 
     @GetMapping("/model-versions")

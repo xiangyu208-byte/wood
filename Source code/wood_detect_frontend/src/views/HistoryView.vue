@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page history-page">
     <header class="page-heading">
       <div>
         <p class="eyebrow">检测档案</p>
@@ -15,7 +15,8 @@
         <el-button text @click="handleReset">清空筛选</el-button>
       </div>
       <el-form :model="queryForm" label-position="top" class="filter-grid" @submit.prevent="handleSearch">
-        <el-form-item label="批次号"><el-input v-model="queryForm.batchNo" placeholder="输入批次号" clearable /></el-form-item>
+        <MaterialBatchPicker :key="batchRevision" v-model="queryForm.materialBatch" empty-label="全部批次" :allow-create="false" @update:model-value="handleSearch" />
+        <el-form-item label="识别任务号"><el-input v-model="queryForm.batchNo" placeholder="输入任务号" clearable /></el-form-item>
         <el-form-item label="图片名称"><el-input v-model="queryForm.imageName" placeholder="输入文件名" clearable /></el-form-item>
         <el-form-item label="来源">
           <el-select v-model="queryForm.sourceType" placeholder="全部来源" clearable>
@@ -57,12 +58,13 @@
             <el-option label="待复核" value="YES" /><el-option label="非待复核" value="NO" />
           </el-select>
         </el-form-item>
-        <el-form-item label="开始时间"><el-date-picker v-model="queryForm.startTime" type="datetime" placeholder="选择开始时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
-        <el-form-item label="结束时间"><el-date-picker v-model="queryForm.endTime" type="datetime" placeholder="选择结束时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
+        <el-form-item class="filter-date" label="开始时间"><el-date-picker v-model="queryForm.startTime" type="datetime" placeholder="选择开始时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
+        <el-form-item class="filter-date" label="结束时间"><el-date-picker v-model="queryForm.endTime" type="datetime" placeholder="选择结束时间" value-format="YYYY-MM-DD HH:mm:ss" clearable /></el-form-item>
         <el-form-item class="filter-submit"><el-button native-type="submit" type="primary">查询记录</el-button></el-form-item>
       </el-form>
     </section>
 
+    <InspectionAnalysis :material-batch="selectedIds.length ? '' : appliedQuery.materialBatch" :record-ids="selectedIds" :revision="revision"/>
     <section class="surface" aria-labelledby="records-title">
       <div class="section-heading records-heading">
         <div><p class="eyebrow">查询结果</p><h2 id="records-title">记录列表</h2></div>
@@ -75,6 +77,9 @@
         </div>
       </div>
 
+      <HistoryBatchActions :selected-ids="selectedIds" :current-batch="appliedQuery.materialBatch"
+                           @clear="selectedIds = []" @changed="showDestination" />
+
       <StatePanel v-if="loading" tone="loading" title="正在加载记录" description="系统正在读取当前筛选条件下的检测记录。" />
       <StatePanel v-else-if="loadError" :tone="errorTone" title="记录加载失败" :description="loadError.message">
         <template #action><el-button type="primary" @click="loadHistory">重新加载</el-button></template>
@@ -85,14 +90,23 @@
 
       <template v-else>
         <div class="desktop-records">
-          <el-table :data="historyList" row-key="recordId" @selection-change="handleSelectionChange">
-            <el-table-column type="selection" width="48" />
+          <el-table :data="historyList" row-key="recordId">
+            <el-table-column width="48">
+              <template #header>
+                <input type="checkbox" aria-label="选择本页全部照片" :checked="pageSelectionCount === historyList.length"
+                       :indeterminate="pageSelectionCount > 0 && pageSelectionCount < historyList.length"
+                       @change="selectPage($event.target.checked)" />
+              </template>
+              <template #default="{ row }">
+                <input type="checkbox" v-model="selectedIds" :value="row.recordId" :aria-label="'选择图片 ' + row.imageName" />
+              </template>
+            </el-table-column>
             <el-table-column label="图片" min-width="180">
-              <template #default="{ row }"><strong class="file-name">{{ row.imageName }}</strong><small>#{{ row.recordId }}</small></template>
+              <template #default="{ row }"><strong class="file-name">{{ row.imageName }}</strong><small>#{{ row.recordId }} · {{ row.materialBatch || '未分批' }}</small></template>
             </el-table-column>
             <el-table-column label="状态" width="126"><template #default="{ row }"><StatusBadge :status="row.status" /></template></el-table-column>
             <el-table-column prop="totalCount" label="缺陷数" width="86" />
-            <el-table-column label="质量评价" width="112"><template #default="{ row }"><strong>{{ formatQualityScore(row.qualityScore) }}</strong><small>{{ qualityGradeLabel(row.qualityGrade) }}</small></template></el-table-column>
+            <el-table-column label="原始评分" width="112"><template #default="{ row }"><strong>{{ formatQualityScore(row.qualityScore) }}</strong><small>{{ qualityGradeLabel(row.qualityGrade) }}</small></template></el-table-column>
             <el-table-column label="人工复核" width="126"><template #default="{ row }"><span class="review-state" :class="`tone-${reviewStatusMeta(row.reviewStatus).tone}`">{{ reviewStatusMeta(row.reviewStatus).label }}</span><small v-if="isReviewPending(row)">自动入队</small></template></el-table-column>
             <el-table-column prop="sourceType" label="来源" width="90"><template #default="{ row }">{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</template></el-table-column>
             <el-table-column label="推理策略" min-width="180"><template #default="{ row }"><span>{{ actualModeLabel(row.actualMode) }} · {{ formatDuration(row.inferenceDurationMs) }}</span></template></el-table-column>
@@ -108,8 +122,8 @@
 
         <ul class="mobile-records" aria-label="历史记录列表">
           <li v-for="row in historyList" :key="row.recordId">
-            <div class="mobile-record-head"><strong>{{ row.imageName }}</strong><StatusBadge :status="row.status" /></div>
-            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>质量评价</dt><dd>{{ formatQualityScore(row.qualityScore) }} · {{ qualityGradeLabel(row.qualityGrade) }}</dd></div><div><dt>人工复核</dt><dd>{{ reviewStatusMeta(row.reviewStatus).label }}{{ isReviewPending(row) ? ' · 自动入队' : '' }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
+            <div class="mobile-record-head"><label><input type="checkbox" v-model="selectedIds" :value="row.recordId" :aria-label="'选择图片 ' + row.imageName"> <strong>{{ row.imageName }}</strong></label><StatusBadge :status="row.status" /></div>
+            <dl><div><dt>缺陷数</dt><dd>{{ row.totalCount }}</dd></div><div><dt>原始评分</dt><dd>{{ formatQualityScore(row.qualityScore) }} · {{ qualityGradeLabel(row.qualityGrade) }}</dd></div><div><dt>人工复核</dt><dd>{{ reviewStatusMeta(row.reviewStatus).label }}{{ isReviewPending(row) ? ' · 自动入队' : '' }}</dd></div><div><dt>推理策略</dt><dd>{{ actualModeLabel(row.actualMode) }}</dd></div><div><dt>推理耗时</dt><dd>{{ formatDuration(row.inferenceDurationMs) }}</dd></div><div><dt>板材批次</dt><dd>{{ row.materialBatch || '未分批' }}</dd></div><div><dt>来源</dt><dd>{{ row.sourceType === 'CAMERA' ? '摄像头' : '上传' }}</dd></div><div><dt>时间</dt><dd>{{ row.createTime }}</dd></div></dl>
             <p v-if="row.errorMessage" class="mobile-error">{{ row.errorMessage }}</p>
             <div class="actions"><el-button type="primary" plain @click="goDetail(row.recordId)">查看详情</el-button><el-button type="danger" text @click="handleDelete(row.recordId)">删除</el-button></div>
           </li>
@@ -160,12 +174,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import HistoryBatchActions from '../components/HistoryBatchActions.vue'
+import MaterialBatchPicker from '../components/MaterialBatchPicker.vue'
+import InspectionAnalysis from '../components/InspectionAnalysis.vue'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { batchDeleteRecords, deleteRecord, deleteRecordsByCondition, getHistory, getModelVersionStats } from '../api/detect'
 import { actualModeLabel, formatDuration, formatMetricChange, formatQualityScore, formatRatioPercent, isReviewPending, qualityGradeLabel, reviewStatusMeta } from '../utils/detection'
 
 const router = useRouter()
+const revision = ref(0), batchRevision = ref(0)
+let requestId = 0
 const historyList = ref([])
 const page = ref(1)
 const size = ref(10)
@@ -174,12 +193,17 @@ const selectedIds = ref([])
 const loading = ref(false)
 const loadError = ref(null)
 const queryForm = ref(emptyQuery())
+const appliedQuery = ref(emptyQuery())
+const pageSelectionCount = computed(() => {
+  const ids = new Set(selectedIds.value)
+  return historyList.value.filter(row => ids.has(row.recordId)).length
+})
 const modelVersions = ref([])
 const modelStatsError = ref(null)
 const errorTone = computed(() => ['offline', 'service'].includes(loadError.value?.kind) ? 'offline' : 'error')
 
 function emptyQuery() {
-  return { imageName: '', status: '', batchNo: '', sourceType: '', hasDefect: '', qualityGrade: '', minQualityScore: null, maxQualityScore: null, modelVersion: '', reviewStatus: '', reviewQueue: '', startTime: '', endTime: '' }
+  return { imageName: '', status: '', batchNo: '', materialBatch: '', sourceType: '', hasDefect: '', qualityGrade: '', minQualityScore: null, maxQualityScore: null, modelVersion: '', reviewStatus: '', reviewQueue: '', startTime: '', endTime: '' }
 }
 
 async function loadModelVersions() {
@@ -193,29 +217,49 @@ async function loadModelVersions() {
 }
 
 async function loadHistory() {
+  const id = ++requestId
   loading.value = true
   loadError.value = null
   try {
-    const payload = await getHistory({ page: page.value, size: size.value, ...queryForm.value })
+    const payload = await getHistory({ page: page.value, size: size.value, ...appliedQuery.value })
+    if (id !== requestId) return
+    revision.value++
     historyList.value = payload.data?.records || []
     total.value = payload.data?.total || 0
-    selectedIds.value = []
   } catch (error) {
-    loadError.value = error
+    if (id === requestId) loadError.value = error
   } finally {
-    loading.value = false
+    if (id === requestId) loading.value = false
   }
 }
 
 function handlePageChange(value) { page.value = value; loadHistory() }
-function handleSearch() { page.value = 1; loadHistory() }
-function handleReset() { queryForm.value = emptyQuery(); page.value = 1; loadHistory() }
-function handleSelectionChange(rows) { selectedIds.value = rows.map(row => row.recordId) }
+function handleSearch() {
+  appliedQuery.value = { ...queryForm.value }
+  selectedIds.value = []
+  page.value = 1
+  loadHistory()
+}
+function handleReset() { queryForm.value = emptyQuery(); handleSearch() }
+function selectPage(checked) {
+  const ids = new Set(selectedIds.value)
+  for (const row of historyList.value) {
+    if (checked) ids.add(row.recordId)
+    else ids.delete(row.recordId)
+  }
+  selectedIds.value = [...ids]
+}
+function showDestination(code) {
+  batchRevision.value++
+  queryForm.value = { ...emptyQuery(), materialBatch: code }
+  handleSearch()
+}
 function goDetail(id) { router.push(`/history/${id}`) }
 async function confirmDelete(message, action) {
   try {
     await ElMessageBox.confirm(message, '删除确认', { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' })
     await action()
+    selectedIds.value = []
     ElMessage.success('删除成功')
     await loadHistory()
   } catch (error) {
@@ -233,12 +277,12 @@ function handleBatchDelete() {
 }
 
 function handleDeleteByCondition() {
-  return confirmDelete(`将删除当前筛选条件下的全部 ${total.value} 条记录，不只当前页，是否继续？`, () => deleteRecordsByCondition(queryForm.value))
+  return confirmDelete(`将删除当前筛选条件下的全部 ${total.value} 条记录，不只当前页，是否继续？`, () => deleteRecordsByCondition(appliedQuery.value))
 }
 
 function buildExportParams() {
   const params = new URLSearchParams()
-  Object.entries(queryForm.value).forEach(([key, value]) => {
+  Object.entries(appliedQuery.value).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') params.append(key, String(value))
   })
   return params.toString()
@@ -256,8 +300,9 @@ function handleDownloadImagesZip() { openExport('images') }
 function handleExportYolo() {
   const params = new URLSearchParams()
   if (selectedIds.value.length) selectedIds.value.forEach(id => params.append('recordIds', String(id)))
-  else if (queryForm.value.reviewStatus && queryForm.value.reviewStatus !== 'UNREVIEWED') params.set('reviewStatus', queryForm.value.reviewStatus)
-  if (queryForm.value.modelVersion) params.set('modelVersion', queryForm.value.modelVersion)
+  else if (appliedQuery.value.reviewStatus && appliedQuery.value.reviewStatus !== 'UNREVIEWED') params.set('reviewStatus', appliedQuery.value.reviewStatus)
+  if (appliedQuery.value.materialBatch) params.set('materialBatch', appliedQuery.value.materialBatch)
+  if (appliedQuery.value.modelVersion) params.set('modelVersion', appliedQuery.value.modelVersion)
   const query = params.toString()
   window.open(`/api/review/export/yolo${query ? `?${query}` : ''}`, '_blank', 'noopener')
 }
@@ -266,12 +311,22 @@ onMounted(() => { loadHistory(); loadModelVersions() })
 </script>
 
 <style scoped>
+.history-page { grid-template-columns: minmax(0, 1fr); }
+.history-page > *, .desktop-records, .version-table-wrap { min-width: 0; }
 .record-total { padding: 8px 12px; border-radius: 999px; background: var(--color-surface-muted); color: var(--color-text-muted); font-size: 13px; }
-.filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 16px; }
+.filter-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 2px 16px; }
+.filter-grid > * { grid-column: span 3; min-width: 0; }
+.filter-grid .filter-date, .filter-grid .filter-submit { grid-column: span 4; }
 .filter-grid :deep(.el-form-item) { margin-bottom: 14px; }
+.filter-grid :deep(.batch-picker) { display: block; margin: 0 0 14px; }
+.filter-grid :deep(.batch-picker label) { display: grid; gap: 8px; }
+.filter-grid :deep(.batch-picker label span) { font-size: 14px; font-weight: 400; line-height: 22px; color: var(--el-text-color-regular); }
+.filter-grid :deep(.batch-picker select) { width: 100%; min-width: 0; height: 42px; }
 .filter-grid :deep(.el-select), .filter-grid :deep(.el-date-editor) { width: 100%; }
 .filter-grid :deep(.el-input-number) { width: 100%; }
+.filter-grid :deep(.el-date-editor) { height: 42px; }
 .filter-submit { align-self: end; }
+.filter-submit :deep(.el-button) { height: 42px; }
 .filter-submit :deep(.el-form-item__content), .filter-submit .el-button { width: 100%; }
 .records-heading { align-items: flex-start; }
 .desktop-records small { display: block; margin-top: 3px; color: var(--color-text-muted); }
@@ -292,9 +347,13 @@ onMounted(() => { loadHistory(); loadModelVersions() })
 .danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--color-border); }
 .danger-zone p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 13px; }
 
-@media (max-width: 980px) { .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 980px) {
+  .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-grid > *, .filter-grid .filter-date { grid-column: auto; }
+  .filter-grid .filter-submit { grid-column: 1 / -1; }
+}
 @media (max-width: 700px) {
-  .filter-grid { grid-template-columns: 1fr; }
+  .filter-grid { grid-template-columns: minmax(0, 1fr); }
   .records-heading { flex-direction: column; }
   .export-actions { width: 100%; }
   .desktop-records { display: none; }

@@ -1,6 +1,6 @@
 <template>
   <div class="page">
-    <header class="page-heading"><div><h1>摄像头识别</h1><p>逐帧取样，完成上一帧后才提交下一帧。检测框显示在对应的采样画面上。</p></div></header>
+    <header class="page-heading"><div><h1>摄像头识别</h1><p>选择板材批次和识别方式，采集结果可在历史记录中查看。</p></div></header>
     <section class="surface">
       <div class="actions">
         <el-button type="primary" :disabled="opening || cameraRunning" @click="startCamera">打开摄像头</el-button>
@@ -9,53 +9,45 @@
       </div>
       <div class="camera-grid">
         <figure><figcaption>实时画面</figcaption><div class="camera-frame"><video ref="video" autoplay playsinline muted></video><span v-if="!cameraRunning">等待开启摄像头</span></div></figure>
-        <figure><figcaption>最近一次采样 {{ sampledAt }}</figcaption><div class="camera-frame"><canvas v-show="frame" ref="overlay" style="width:100%;height:auto"></canvas><span v-if="!frame">等待采样</span></div></figure>
+        <figure><figcaption>最近一次识别或拍照 {{ sampledAt }}</figcaption><div class="camera-frame"><canvas v-show="frame" ref="overlay" style="width:100%;height:auto"></canvas><span v-if="!frame">等待拍照或识别</span></div></figure>
       </div>
       <p v-if="stats" role="status">{{ stats }}</p>
       <DetectionSettings v-model="settings"/>
-      <fieldset :disabled="running || processing" class="capture-options"><legend>采样与归档</legend>
-        <label>连续模式 <select v-model="mode"><option value="preview">实时抽帧预览</option><option value="archive">定点连续留档</option></select></label>
-        <label v-if="mode==='archive'">采样最短间隔（秒） <input type="number" v-model.number="interval" min="1" max="3600"></label>
-        <label>归档板面 <select :value="boardId" @change="loadBoard(Number($event.target.value))"><option value="">仅存历史</option><option v-for="b in boards" :key="b.id" :value="b.id">{{ b.code }} · {{ b.face }} 面</option></select></label>
-        <PlacementFields v-if="board" v-model="placement" :view="board" />
+      <MaterialBatchPicker v-model="materialBatch" :disabled="running || processing"/>
+      <fieldset :disabled="running || processing" class="modes"><legend>识别方式</legend>
+        <label><input type="radio" v-model="mode" value="manual"> 手动拍照</label>
+        <label><input type="radio" v-model="mode" value="archive"> 连续识别</label>
+        <label><input type="radio" v-model="mode" value="preview"> 实时识别</label>
+        <label v-if="mode === 'archive'">每张间隔（秒） <input type="number" v-model.number="interval" min="1" max="3600"></label>
       </fieldset>
-      <p class="muted">{{ mode==='archive'?'每次采样都会生成一条历史记录。板材移动时，请选择待定位或与同板基准局部照配准。':'预览帧不计入历史，点击保存可将选中帧识别归档。' }}</p>
+      <p class="muted">{{ mode === 'manual' ? '拍照后可检查画面，再点击识别并保存。' : mode === 'archive' ? '按设定间隔识别，每张照片自动保存到历史记录。' : materialBatch ? '摄像头持续识别，每次完成的结果自动保存到所选批次。' : '摄像头持续显示检测框。停止后可保存当前画面；选择板材批次可自动归档。' }}</p>
       <div class="actions">
-        <el-button type="primary" :disabled="!cameraRunning || running || processing || opening || (boardId && !board)" @click="startLoop">开始连续识别</el-button>
-        <el-button :disabled="!running" @click="stopLoop">停止连续识别</el-button>
-        <el-button :disabled="!frame || running || processing || !!saved || (boardId && !board)" @click="saveManual">识别并保存选中帧</el-button>
+        <el-button v-if="mode !== 'manual'" type="primary" :disabled="!cameraRunning || running || processing || opening" @click="startLoop">开始{{ mode === 'archive' ? '连续识别' : '实时识别' }}</el-button>
+        <el-button v-if="running" @click="stopLoop">停止识别</el-button>
+        <el-button :disabled="!frame || running || processing || !!saved" @click="saveManual">识别并保存</el-button>
       </div>
       <p role="alert" v-if="error" class="inline-error">{{ error }}</p>
     </section>
+    <p v-if="!materialBatch && sessionIds.length === 1000" class="muted">本次分析显示最近 1000 张未分批照片，更早照片可从历史记录查看。</p>
+    <InspectionAnalysis v-if="!running && !processing && (materialBatch || sessionIds.length)" :material-batch="materialBatch" :record-ids="sessionIds" :revision="lastArchivedId" />
     <section v-if="saved" class="surface"><ResultDetails :key="saved.recordId" :result="saved"/></section>
   </div>
 </template>
 <script setup>
-import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
-import { useRoute } from 'vue-router'
+import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import DetectionSettings from '../components/DetectionSettings.vue'
 import ResultDetails from '../components/ResultDetails.vue'
-import PlacementFields from '../components/PlacementFields.vue'
+import MaterialBatchPicker from '../components/MaterialBatchPicker.vue'
+import InspectionAnalysis from '../components/InspectionAnalysis.vue'
 import { cameraUploadDetect, previewDetect } from '../api/detect'
-import { getBoard, listBoards, placeRecord } from '../api/boards'
 import { classNameZh } from '../utils/detection'
-const route=useRoute(), video=ref(null), overlay=ref(null)
+const video=ref(null), overlay=ref(null)
 const cameraRunning=ref(false), opening=ref(false), running=ref(false), processing=ref(false)
 const frame=shallowRef(null), saved=ref(null), stats=ref(''), error=ref(''), sampledAt=ref('')
-const mode=ref('preview'), interval=ref(3), settings=ref({modelMode:'FAST',confidenceThreshold:0.25,precision:'AUTO'})
-const boards=ref([]), board=ref(null), boardId=ref(''), placement=ref({mode:'UNKNOWN',row:1,col:1,anchorId:null})
-let stream=null, epoch=0, timer=null, controller=null, disposed=false, boardRequest=0
-onMounted(async()=>{
-  try {boards.value=(await listBoards()).data;if(route.query.board) await loadBoard(Number(route.query.board))}
-  catch(e) {error.value=e.message}
-})
-async function loadBoard(id) {
-  const revision=++boardRequest
-  board.value=null;boardId.value=id || '';placement.value={mode:'UNKNOWN',row:1,col:1,anchorId:null}
-  if(!id) return
-  try {const value=(await getBoard(id)).data;if(revision===boardRequest)board.value=value}
-  catch(e) {if(revision===boardRequest){error.value=e.message;boardId.value=''}}
-}
+const mode=ref('manual'), interval=ref(3), settings=ref({modelMode:'FAST',confidenceThreshold:0.25,precision:'AUTO'})
+const materialBatch = ref(''), sessionIds = ref([]), lastArchivedId = ref(0)
+let stream=null, epoch=0, timer=null, controller=null, disposed=false
+watch(materialBatch, () => { sessionIds.value=[]; lastArchivedId.value=0; frame.value=null; saved.value=null; stats.value=''; sampledAt.value='' })
 async function startCamera() {
   error.value='';opening.value=true
   try {
@@ -67,7 +59,7 @@ async function startCamera() {
 }
 function stopLoop() {
   epoch++;running.value=false;clearTimeout(timer)
-  if (mode.value==='preview') controller?.abort()
+  if (mode.value==='preview' && !materialBatch.value) controller?.abort()
 }
 function stopCamera() {
   stopLoop();stream?.getTracks().forEach(t=>t.stop());stream=null
@@ -82,7 +74,7 @@ async function grab() {
   canvas.getContext('2d').drawImage(v,0,0)
   const time=new Date()
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.92))
-  if(!blob)throw new Error('采样失败')
+  if(!blob)throw new Error('摄像头照片读取失败')
   return {canvas,time,file:new File([blob],'camera_'+time.getTime()+'.jpg',{type:'image/jpeg'})}
 }
 function show(sample,details=[]) {
@@ -104,13 +96,12 @@ async function manualCapture() {
   catch(e) {error.value=e.message} finally {processing.value=false}
 }
 async function archive(sample,options,config) {
-  const r=(await cameraUploadDetect(sample.file,options,config)).data
+  const r=(await cameraUploadDetect(sample.file,{...options,materialBatch:materialBatch.value},config)).data
   if(r.status!=='SUCCESS')throw new Error(r.errorMessage||'识别失败')
-  saved.value=r
-  if(board.value) {
-    const id=board.value.board.id
-    await placeRecord(id,r.recordId,{mode:'UNKNOWN'})
-    if(placement.value.mode!=='UNKNOWN')await placeRecord(id,r.recordId,{...placement.value})
+  if (!disposed) {
+    saved.value=r
+    lastArchivedId.value=r.recordId
+    if (!materialBatch.value) sessionIds.value=[...sessionIds.value.slice(-999),r.recordId]
   }
   return r
 }
@@ -121,8 +112,8 @@ async function saveManual() {
 }
 function startLoop() {
   if(!cameraRunning.value || running.value || processing.value)return
-  if(mode.value==='archive' && !(interval.value>=1 && interval.value<=3600)){error.value='采样间隔须为 1–3600 秒';return}
-  error.value='';stats.value='';saved.value=null;running.value=true
+  if(mode.value==='archive' && !(interval.value>=1 && interval.value<=3600)){error.value='图片间隔须为 1–3600 秒';return}
+  error.value='';stats.value='';running.value=true
   tick(++epoch)
 }
 async function tick(generation) {
@@ -132,10 +123,12 @@ async function tick(generation) {
     const sample=await grab()
     if(generation!==epoch)return
     const options={...settings.value},config={signal:controller.signal,timeout:145000}
-    const data=mode.value==='archive'?await archive(sample,options,config):(await previewDetect(sample.file,options,config)).data
-    if(generation!==epoch)return
+    const persist = mode.value === 'archive' || Boolean(materialBatch.value)
+    const data = persist ? await archive(sample,options,config) : (await previewDetect(sample.file,options,config)).data
+    if(disposed || (generation!==epoch && !persist))return
+    if (!persist) saved.value=null
     show(sample,data.details)
-    stats.value='本帧 '+(data.details?.length || 0)+' 个检测框 · 采集至返回 '+Math.round(performance.now()-start)+' ms'
+    stats.value='本次识别 '+(data.details?.length || 0)+' 个检测框 · 处理耗时 '+Math.round(performance.now()-start)+' ms'
   } catch(e) {
     if(generation===epoch){error.value=e.message;stopLoop()}
   } finally {
@@ -150,6 +143,8 @@ onBeforeUnmount(()=>{disposed=true;stopCamera()})
 </script>
 
 <style scoped>
+.modes { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:12px; border:1px solid var(--color-border); border-radius:8px }
+.modes label { display:flex; align-items:center; gap:5px } .modes input[type=number] { width:75px }
 .camera-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
 .camera-grid figure { min-width: 0; margin: 0; }
 .camera-grid figcaption { margin-bottom: 8px; font-size: 13px; font-weight: 650; }

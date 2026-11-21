@@ -28,7 +28,6 @@ from inference_pipeline import (
     run_inference,
 )
 from service_runtime import InferenceBusyError, InferenceGate, InputImageError, resolve_input_image
-from board_registration import translation_between
 
 logger = logging.getLogger("wood-detect-inference")
 
@@ -100,26 +99,6 @@ class PredictRequest(BaseModel):
     modelMode: Literal["FAST", "STANDARD", "ACCURATE"] = "STANDARD"
     confidenceThreshold: float = Field(default=CONFIDENCE_THRESHOLD, ge=0.05, le=0.95)
     precision: Literal["AUTO", "FP32", "FP16"] = "AUTO"
-
-
-class RegistrationRequest(BaseModel):
-    imagePath: str
-    anchorPath: str
-
-
-@app.post("/register-local-view")
-def register_local_view(req: RegistrationRequest):
-    try:
-        paths = [resolve_input_image(path, UPLOAD_ROOT) for path in (req.imagePath, req.anchorPath)]
-        with inference_gate.slot():
-            images = [cv2.imread(str(path), cv2.IMREAD_GRAYSCALE) for path in paths]
-            if any(image is None for image in images):
-                raise ValueError("照片无法解码")
-            return translation_between(*images)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except InferenceBusyError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 class DetectItem(BaseModel):

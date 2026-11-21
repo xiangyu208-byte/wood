@@ -17,6 +17,7 @@
     </p>
 
     <dl class="summary-grid">
+      <div><dt>板材批次</dt><dd>{{ result.materialBatch || '未分批' }}</dd></div>
       <div><dt>缺陷数量</dt><dd>{{ result.totalCount ?? 0 }}</dd></div>
       <div><dt>复核候选</dt><dd>{{ reviewCandidateCount(result.details) }}</dd></div>
       <div><dt>请求模式</dt><dd>{{ requestedModeLabel(result.modelMode) }}</dd></div>
@@ -36,7 +37,7 @@
     <section v-if="result.qualityScore !== null && result.qualityScore !== undefined" class="quality-panel" :aria-labelledby="`quality-${result.recordId}`">
       <div class="quality-overview">
         <div>
-          <p class="eyebrow">可解释质量评价</p>
+          <p class="eyebrow">原始识别评分</p>
           <h3 :id="`quality-${result.recordId}`">质量分 {{ formatQualityScore(result.qualityScore) }}</h3>
         </div>
         <strong class="quality-grade" :class="`grade-${String(result.qualityGrade || '').toLowerCase()}`">
@@ -97,16 +98,12 @@
         </tbody>
       </table>
     </div>
-    <div v-if="result.status === 'SUCCESS'" class="actions">
-      <router-link :to="{path:'/boards',query:{record:result.recordId}}">在板材地图中定位这张照片</router-link>
-    </div>
-    <VisualReview v-if="result.status === 'SUCCESS'" :key="result.recordId" :record-id="result.recordId" />
+    <router-link v-if="result.status === 'SUCCESS' && $route.name !== 'HistoryDetail'" :to="'/history/' + result.recordId + '#manual-review'">在原图上人工复核</router-link>
   </section>
 </template>
 
 <script setup>
 import StatusBadge from './StatusBadge.vue'
-import VisualReview from './VisualReview.vue'
 import {
   actualModeLabel,
   classNameZh,

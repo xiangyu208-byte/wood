@@ -19,7 +19,8 @@
       </StatePanel>
       <template v-else-if="detailData">
         <ResultDetails :result="detailData" />
-        <ReviewEditor v-if="detailData.status === 'SUCCESS'" :result="detailData" @saved="handleReviewSaved" />
+        <InspectionAnalysis v-if="detailData.status === 'SUCCESS'" :record-ids="[detailData.recordId]" :revision="analysisRevision" />
+        <ReviewEditor id="manual-review" v-if="detailData.status === 'SUCCESS'" :result="detailData" @saved="handleReviewSaved" />
         <div v-if="canRetry" class="retry-row">
           <div><strong>这条记录未成功完成</strong><p>可重新执行当前批次中的失败和已取消项目。</p></div>
           <el-button type="primary" :loading="retrying" @click="handleRetry">重试所在批次</el-button>
@@ -30,10 +31,11 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ResultDetails from '../components/ResultDetails.vue'
+import InspectionAnalysis from '../components/InspectionAnalysis.vue'
 import ReviewEditor from '../components/ReviewEditor.vue'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -41,6 +43,7 @@ import { getDetail, retryBatch } from '../api/detect'
 
 const route = useRoute()
 const router = useRouter()
+const analysisRevision = ref(0)
 const detailData = ref(null)
 const loading = ref(true)
 const loadError = ref(null)
@@ -51,6 +54,7 @@ const errorTone = computed(() => ['offline', 'service'].includes(loadError.value
 const canRetry = computed(() => detailData.value?.batchNo && ['FAIL', 'CANCELLED'].includes(detailData.value.status))
 
 function handleReviewSaved(updated) {
+  analysisRevision.value++
   detailData.value = updated
 }
 
@@ -83,7 +87,16 @@ async function handleRetry() {
   }
 }
 
-onMounted(loadDetail)
+async function loadRouteRecord() {
+  if (refreshTimer) window.clearTimeout(refreshTimer)
+  await loadDetail()
+  if (route.hash === '#manual-review') {
+    await nextTick()
+    document.getElementById('manual-review')?.scrollIntoView()
+  }
+}
+watch(() => route.params.id, loadRouteRecord)
+onMounted(loadRouteRecord)
 onBeforeUnmount(() => { if (refreshTimer) window.clearTimeout(refreshTimer) })
 </script>
 

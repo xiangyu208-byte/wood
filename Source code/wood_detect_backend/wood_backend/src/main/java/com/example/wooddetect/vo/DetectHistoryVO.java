@@ -16,6 +16,7 @@ public class DetectHistoryVO {
      * 批次号
      */
     private String batchNo;
+    private String materialBatch;
 
     /**
      * 来源类型：UPLOAD / CAMERA

@@ -170,7 +170,7 @@ class ReviewServiceImplTest {
                 new FileStorageService(properties), new ObjectMapper(), new NoOpTransactionManager());
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        exportService.exportYoloDataset(null, null, null, response);
+        exportService.exportYoloDataset(null, null, null, null, response);
 
         Map<String, String> entries = unzipText(response.getContentAsByteArray());
         assertEquals("4 0.200000 0.200000 0.200000 0.200000\n",

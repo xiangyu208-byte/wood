@@ -18,12 +18,8 @@ Thumbs.db
 /.playwright-cli/
 /output/playwright/
 
-# 数据集源文件缓存不入库；最终 10 类数据集通过 Git LFS 版本化
-/datasets/raw/
-/datasets/datasets/
-/datasets/metadata/openverse_candidates.json
-/datasets/wood_defect_12class-pre-*/
-/datasets/wood_defect_12class-failed-*/
+# 本地训练图片、标注和数据来源文件
+/datasets/
 
 # 仅供本地参考，不上传到 GitHub
 /参考ppt.pptx

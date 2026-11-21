@@ -10,7 +10,7 @@ import java.util.List;
 public interface ReviewService {
     DetectResponseVO submitReview(Long recordId, ReviewSubmissionDTO submission);
 
-    void exportYoloDataset(List<Long> recordIds, String reviewStatus, String modelVersion,
+    void exportYoloDataset(List<Long> recordIds, String reviewStatus, String modelVersion, String materialBatch,
                            HttpServletResponse response);
 
     List<ModelVersionStatsVO> getModelVersionStats();

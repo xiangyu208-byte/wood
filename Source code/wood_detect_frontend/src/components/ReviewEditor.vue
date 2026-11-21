@@ -23,27 +23,40 @@
     </p>
 
     <div class="annotation-heading">
-      <div><h4>最终标注框</h4><p>修改类别或坐标、删除误检框，也可以补充漏检目标。</p></div>
-      <el-button @click="addAnnotation">补充漏检框</el-button>
+      <div><h4>原图标注</h4><p>选择类别后在图上拖动画框。选择已有标注可移动框，拖动四角可调整大小。</p></div>
     </div>
-
-    <div v-if="annotations.length" class="annotation-list">
-      <div v-for="(item, index) in annotations" :key="item.localId" class="annotation-row">
-        <span class="annotation-index">{{ index + 1 }}</span>
-        <el-select v-model="item.className" aria-label="缺陷类别">
-          <el-option v-for="option in classOptions" :key="option.value" :label="option.label" :value="option.value" />
-        </el-select>
-        <div class="coordinate-grid">
-          <label>X1<el-input-number v-model="item.x1" :min="0" :max="result.imageWidth || 10000" controls-position="right" /></label>
-          <label>Y1<el-input-number v-model="item.y1" :min="0" :max="result.imageHeight || 10000" controls-position="right" /></label>
-          <label>X2<el-input-number v-model="item.x2" :min="0" :max="result.imageWidth || 10000" controls-position="right" /></label>
-          <label>Y2<el-input-number v-model="item.y2" :min="0" :max="result.imageHeight || 10000" controls-position="right" /></label>
-        </div>
-        <span class="annotation-source">{{ annotationSourceLabel(item.sourceType) }}</span>
-        <el-button type="danger" text :aria-label="`删除第 ${index + 1} 个标注框`" @click="removeAnnotation(index)">删除</el-button>
-      </div>
+    <fieldset class="editor-tools" :disabled="Boolean(saving)">
+      <label>缺陷类型
+        <select v-model="currentClass" @change="changeClass">
+          <option v-for="option in classOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
+      <button type="button" :aria-pressed="tool === 'draw'" @click="startDrawing">画新框</button>
+      <button type="button" :aria-pressed="tool === 'select'" @click="tool = 'select'">选择 / 调整</button>
+      <button type="button" :disabled="!selected" @click="removeSelected">删除选中框</button>
+    </fieldset>
+    <div v-if="result.imageUrl" class="image-stage">
+      <img :src="fullImageUrl(result.imageUrl)" :alt="result.imageName + ' 标注底图'" draggable="false"
+           @load="imageReady = true" @error="imageReady = false" />
+      <svg v-if="imageReady && result.imageWidth && result.imageHeight" ref="surface"
+           :viewBox="'0 0 ' + result.imageWidth + ' ' + result.imageHeight" preserveAspectRatio="none"
+           :class="{drawing: tool === 'draw'}" aria-label="缺陷标注画布"
+           @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="cancelGesture" @lostpointercapture="cancelGesture">
+        <g v-for="(box,i) in annotations" :key="box.localId" :data-box="box.localId" :class="{chosen: selectedId === box.localId}">
+          <rect :x="box.x1" :y="box.y1" :width="box.x2-box.x1" :height="box.y2-box.y1" class="outline"/>
+          <text :x="box.x1+2" :y="Math.max(box.y1-3,labelSize)" :font-size="labelSize">{{ i+1 }} · {{ classNameZh(box.className) }}</text>
+          <template v-if="tool === 'select' && selectedId === box.localId">
+            <circle v-for="corner in corners" :key="corner.join('')" :data-corner="corner.join(',')" :cx="box[corner[0]]" :cy="box[corner[1]]" :r="handleSize" />
+          </template>
+        </g>
+        <rect v-if="draft" class="outline draft" :x="draft.x1" :y="draft.y1" :width="draft.x2-draft.x1" :height="draft.y2-draft.y1"/>
+      </svg>
     </div>
-    <p v-else class="annotation-empty">当前最终标注为空；可补充漏检框，或将整条检测标记为错误。</p>
+    <p v-if="!imageReady || !result.imageWidth || !result.imageHeight" class="muted">原图或尺寸尚未就绪。</p>
+    <div class="box-list" aria-label="标注列表">
+      <button v-for="(box,i) in annotations" :key="box.localId" type="button" :disabled="Boolean(saving)" :aria-pressed="box.localId === selectedId" @click="selectBox(box)">{{ i+1 }} · {{ classNameZh(box.className) }}</button>
+      <span v-if="!annotations.length">当前没有标注框</span>
+    </div>
 
     <label class="comment-field">
       <span>复核备注（可选）</span>
@@ -55,16 +68,16 @@
       <el-button type="primary" :loading="saving === 'CORRECTED'" :disabled="Boolean(saving)" @click="saveReview('CORRECTED')">保存人工修正</el-button>
       <el-button type="danger" plain :loading="saving === 'INCORRECT'" :disabled="Boolean(saving)" @click="saveReview('INCORRECT')">标记结果错误</el-button>
     </div>
-    <p class="review-note">“结果正确”会采用原始检测框；“保存人工修正”会采用当前表格；“结果错误”会保存为空标签负样本。</p>
+    <p class="review-note">“结果正确”会采用原始检测框；“保存人工修正”会采用图上的标注；“结果错误”会保存为空标签负样本。</p>
   </section>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { submitReview } from '../api/detect'
 import {
-  annotationSourceLabel,
+  fullImageUrl,
   classNameZh,
   formatConfidence,
   isReviewPending,
@@ -82,7 +95,13 @@ const classOptions = classNames.map(value => ({ value, label: classNameZh(value)
 const annotations = ref([])
 const comment = ref('')
 const saving = ref('')
-let localSequence = 0
+const surface = ref(null), imageReady = ref(false), tool = ref('draw')
+const selectedId = ref(null), currentClass = ref('dry_knot'), draft = ref(null)
+const selected = computed(() => annotations.value.find(box => box.localId === selectedId.value))
+const corners = [['x1','y1'], ['x1','y2'], ['x2','y1'], ['x2','y2']]
+const labelSize = computed(() => Math.max(10, props.result.imageWidth / 70))
+const handleSize = computed(() => Math.max(3, props.result.imageWidth / 145))
+let localSequence = 0, gesture = null
 
 function editableAnnotations(result) {
   const reviewed = result.reviewStatus && result.reviewStatus !== 'UNREVIEWED'
@@ -101,25 +120,72 @@ function editableAnnotations(result) {
 }
 
 watch(() => props.result, result => {
+  selectedId.value = null; draft.value = null; gesture = null
   annotations.value = editableAnnotations(result)
+  tool.value = annotations.value.length ? 'select' : 'draw'
   comment.value = result.reviewComment || ''
 }, { immediate: true, deep: true })
 
-function addAnnotation() {
-  annotations.value.push({
-    localId: ++localSequence,
-    originalDetailId: null,
-    className: 'dry_knot',
-    x1: 0,
-    y1: 0,
-    x2: Math.min(100, props.result.imageWidth || 100),
-    y2: Math.min(100, props.result.imageHeight || 100),
-    sourceType: 'HUMAN_ADDED'
-  })
+function selectBox(box) {
+  selectedId.value = box.localId; currentClass.value = box.className; tool.value = 'select'
 }
-
-function removeAnnotation(index) {
-  annotations.value.splice(index, 1)
+function startDrawing() { tool.value = 'draw'; selectedId.value = null }
+function changeClass() { if (selected.value && tool.value === 'select') selected.value.className = currentClass.value }
+function removeSelected() {
+  annotations.value = annotations.value.filter(box => box.localId !== selectedId.value)
+  selectedId.value = null
+}
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)) }
+function point(e) {
+  const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(surface.value.getScreenCTM().inverse())
+  return {x:clamp(Math.round(p.x),0,props.result.imageWidth), y:clamp(Math.round(p.y),0,props.result.imageHeight)}
+}
+function bounds(a,b) {
+  return {x1: Math.min(a.x,b.x), y1: Math.min(a.y,b.y), x2: Math.max(a.x,b.x), y2: Math.max(a.y,b.y)}
+}
+function pointerDown(e) {
+  if (saving.value || gesture || e.button !== 0) return
+  const start = point(e)
+  if (tool.value === 'draw') {
+    gesture = {id:e.pointerId, start, mode:'draw'}; draft.value = bounds(start,start)
+  } else {
+    const id = Number(e.target.closest('[data-box]')?.dataset.box)
+    const box = annotations.value.find(b => b.localId === id)
+    if (!box) { selectedId.value = null; return }
+    selectBox(box)
+    gesture = {id:e.pointerId,start,mode:'adjust',original:{...box},corner:e.target.dataset.corner?.split(',')}
+  }
+  surface.value.setPointerCapture(e.pointerId)
+  e.preventDefault()
+}
+function pointerMove(e) {
+  if (!gesture || gesture.id !== e.pointerId) return
+  const p = point(e), {start,original,corner} = gesture
+  if (gesture.mode === 'draw') { draft.value = bounds(start,p); return }
+  const box = selected.value
+  if (corner) {
+    box[corner[0]] = corner[0] === 'x1' ? Math.min(p.x,box.x2-1) : Math.max(p.x,box.x1+1)
+    box[corner[1]] = corner[1] === 'y1' ? Math.min(p.y,box.y2-1) : Math.max(p.y,box.y1+1)
+  } else {
+    const dx = clamp(p.x-start.x,-original.x1,props.result.imageWidth-original.x2)
+    const dy = clamp(p.y-start.y,-original.y1,props.result.imageHeight-original.y2)
+    Object.assign(box,{x1:original.x1+dx,x2:original.x2+dx,y1:original.y1+dy,y2:original.y2+dy})
+  }
+}
+function pointerUp(e) {
+  if (!gesture || gesture.id !== e.pointerId) return
+  pointerMove(e)
+  const d = draft.value
+  if (d && d.x2>d.x1 && d.y2>d.y1) {
+    const box = {...d,localId:++localSequence,originalDetailId:null,className:currentClass.value}
+    annotations.value.push(box); selectBox(box)
+  }
+  gesture = null; draft.value = null
+}
+function cancelGesture(e) {
+  if (!gesture || gesture.id !== e.pointerId) return
+  if (gesture.original && selected.value) Object.assign(selected.value, gesture.original)
+  gesture = null; draft.value = null
 }
 
 async function saveReview(reviewStatus) {
@@ -160,27 +226,27 @@ async function saveReview(reviewStatus) {
 .annotation-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 22px 0 10px; }
 .annotation-heading h4, .annotation-heading p { margin: 0; }
 .annotation-heading p { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; }
-.annotation-list { display: grid; gap: 8px; }
-.annotation-row { display: grid; grid-template-columns: 28px minmax(130px, .75fr) minmax(360px, 2fr) minmax(100px, .65fr) auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--color-border); border-radius: 10px; }
-.annotation-index { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: var(--color-surface-muted); font-size: 12px; font-weight: 700; }
-.coordinate-grid { display: grid; grid-template-columns: repeat(4, minmax(75px, 1fr)); gap: 6px; }
-.coordinate-grid label { display: grid; gap: 3px; color: var(--color-text-muted); font-size: 11px; }
-.coordinate-grid :deep(.el-input-number) { width: 100%; }
-.annotation-source { color: var(--color-text-muted); font-size: 12px; }
-.annotation-empty { padding: 18px; border: 1px dashed var(--color-border); border-radius: 10px; color: var(--color-text-muted); text-align: center; }
+.editor-tools,.box-list {display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; padding:0; border:0}
+.editor-tools select,.editor-tools button,.box-list button {border:1px solid var(--color-border); background:white; color:var(--color-text); border-radius:6px; padding:7px 10px; font:inherit}
+button[aria-pressed=true] {background:#e3f2e9; border-color:#31765c}
+.image-stage {position:relative; width:fit-content; max-width:100%; margin:10px auto; line-height:0; background:var(--color-surface-muted)}
+.image-stage img {display:block; max-width:100%; max-height:75vh; width:auto; height:auto}
+.image-stage svg {position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:default; user-select:none}
+.image-stage svg.drawing {cursor:crosshair}
+.outline {fill:#12635522; stroke:#20deae; stroke-width:2; vector-effect:non-scaling-stroke}
+.chosen .outline,.draft {fill:#edb94e30; stroke:#ffce62}
+.image-stage circle {fill:white; stroke:#80520b; vector-effect:non-scaling-stroke; cursor:nwse-resize}
+.image-stage text {fill:white; stroke:#191e1b; stroke-width:2.5px; paint-order:stroke; pointer-events:none}
+.box-list {font-size:13px}
 .comment-field { display: grid; gap: 7px; margin-top: 18px; font-size: 13px; font-weight: 650; }
 .review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .review-note { margin: 10px 0 0; color: var(--color-text-muted); font-size: 12px; }
 @media (max-width: 980px) {
   .review-context { grid-template-columns: repeat(2, 1fr); }
-  .annotation-row { grid-template-columns: 28px 1fr auto; }
-  .coordinate-grid { grid-column: 2 / -1; }
-  .annotation-source { grid-column: 2; }
 }
 @media (max-width: 600px) {
   .review-context { grid-template-columns: 1fr; }
   .annotation-heading { align-items: stretch; flex-direction: column; }
-  .coordinate-grid { grid-template-columns: repeat(2, 1fr); }
   .review-actions { align-items: stretch; flex-direction: column; }
 }
 </style>

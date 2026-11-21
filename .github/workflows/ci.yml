@@ -54,7 +54,7 @@ jobs:
       - run: python -m pip install numpy opencv-python-headless
       - run: python -m unittest discover -s wood_detect -p 'test_*.py' -v
         working-directory: "Source code/wood_detect_python"
-      - run: python -m py_compile wood_detect/detect.py wood_detect/inference_pipeline.py wood_detect/service_runtime.py wood_detect/board_registration.py
+      - run: python -m py_compile wood_detect/detect.py wood_detect/inference_pipeline.py wood_detect/service_runtime.py
         working-directory: "Source code/wood_detect_python"
       - run: docker compose config --quiet
         working-directory: "Source code"

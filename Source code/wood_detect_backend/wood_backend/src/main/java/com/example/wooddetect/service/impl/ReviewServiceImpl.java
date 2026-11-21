@@ -133,7 +133,7 @@ public class ReviewServiceImpl implements ReviewService {
     public void exportYoloDataset(
             List<Long> recordIds,
             String reviewStatus,
-            String modelVersion,
+            String modelVersion, String materialBatch,
             HttpServletResponse response) {
         QueryWrapper<DetectRecord> query = new QueryWrapper<DetectRecord>()
                 .eq("status", DetectionStatus.SUCCESS)
@@ -147,6 +147,7 @@ public class ReviewServiceImpl implements ReviewService {
             query.in("id", normalizedIds);
         }
         if (hasText(reviewStatus)) query.eq("review_status", normalizeReviewStatus(reviewStatus));
+        if (hasText(materialBatch)) query.eq("material_batch", materialBatch.trim());
         if (hasText(modelVersion)) query.eq("model_version", modelVersion.trim());
 
         List<DetectRecord> records = recordMapper.selectList(query);

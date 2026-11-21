@@ -95,6 +95,7 @@ img { display: block; max-width: 100%; }
 .primary-nav a:hover { color: var(--color-primary-deep); background: var(--color-surface-muted); }
 .primary-nav a.router-link-active { color: var(--color-surface); background: var(--color-primary); }
 .app-main { width: min(1180px, 100%); margin: 0 auto; flex: 1; padding: clamp(22px, 4vw, 48px) clamp(14px, 3vw, 28px); }
+.app-main:has(> .history-page) { width: min(1440px, 100%); }
 .app-footer { padding: 18px; color: var(--color-text-muted); font-size: 12px; text-align: center; }
 .route-loading { padding: 80px 20px; color: var(--color-text-muted); text-align: center; }
 

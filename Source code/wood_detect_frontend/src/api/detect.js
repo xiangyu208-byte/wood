@@ -43,6 +43,7 @@ request.interceptors.response.use(
 )
 
 function appendOptions(formData, options = {}) {
+  if (options.materialBatch) formData.append('materialBatch', options.materialBatch)
   formData.append('modelMode', options.modelMode || 'STANDARD')
   formData.append('confidenceThreshold', String(options.confidenceThreshold ?? 0.25))
   formData.append('precision', options.precision || 'AUTO')

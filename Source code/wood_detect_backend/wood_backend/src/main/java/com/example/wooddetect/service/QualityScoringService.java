@@ -28,6 +28,10 @@ public class QualityScoringService {
             Map.entry("suspected_anomaly", "疑似异常（需复核）")
     );
 
+    public static String classLabel(String code) {
+        return CLASS_LABELS.getOrDefault(code, code);
+    }
+
     private final QualityScoringProperties properties;
 
     public QualityScoringService(QualityScoringProperties properties) {
@@ -58,7 +62,7 @@ public class QualityScoringService {
             categoryPenalty += points;
             deductions.add(new QualityDeductionVO(
                     "CATEGORY",
-                    CLASS_LABELS.getOrDefault(entry.getKey(), entry.getKey()),
+                    classLabel(entry.getKey()),
                     points,
                     String.format(Locale.ROOT, "%d 个 × %.2f 分", entry.getValue(), weight)
             ));

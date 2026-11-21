@@ -22,7 +22,7 @@
         :auto-upload="false"
         :limit="20"
         accept=".jpg,.jpeg,.png"
-        :disabled="isActive"
+        :disabled="isActive || phase === 'submitting'"
         aria-label="选择木材图片"
       >
         <div class="upload-callout">
@@ -31,10 +31,11 @@
         </div>
       </el-upload>
 
+      <MaterialBatchPicker v-model="materialBatch" :disabled="isActive || phase === 'submitting'" />
       <DetectionSettings v-model="settings" />
 
       <div class="upload-actions actions">
-        <el-button type="primary" :loading="phase === 'submitting'" :disabled="!selectedFiles.length || isActive" @click="submitBatch">
+        <el-button type="primary" :loading="phase === 'submitting'" :disabled="!selectedFiles.length || isActive || phase === 'submitting'" @click="submitBatch">
           开始批量识别
         </el-button>
         <el-button v-if="canCancel" type="danger" plain :loading="cancelling" @click="handleCancel">取消任务</el-button>
@@ -95,6 +96,7 @@
       </StatePanel>
     </section>
 
+    <InspectionAnalysis v-if="completedResults.length && !isActive" :record-ids="completedResults.map(r => r.recordId)" :material-batch="taskMaterialBatch" />
     <section v-if="completedResults.length" class="surface" aria-labelledby="results-title">
       <div class="section-heading">
         <div>
@@ -116,6 +118,8 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import DetectionSettings from '../components/DetectionSettings.vue'
+import MaterialBatchPicker from '../components/MaterialBatchPicker.vue'
+import InspectionAnalysis from '../components/InspectionAnalysis.vue'
 import ResultDetails from '../components/ResultDetails.vue'
 import StatePanel from '../components/StatePanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -129,6 +133,7 @@ import {
 } from '../api/detect'
 import { isTaskActive, isTaskTerminal } from '../utils/detection'
 
+const materialBatch = ref(''), taskMaterialBatch = ref('')
 const uploadFiles = ref([])
 const settings = ref({ modelMode: 'STANDARD', confidenceThreshold: 0.25, precision: 'AUTO' })
 const task = ref(null)
@@ -165,7 +170,8 @@ async function submitBatch() {
   pollError.value = null
   completedResults.value = []
   try {
-    const payload = await batchUploadDetectAsync(selectedFiles.value, settings.value)
+    taskMaterialBatch.value = materialBatch.value
+    const payload = await batchUploadDetectAsync(selectedFiles.value, {...settings.value, materialBatch: taskMaterialBatch.value})
     task.value = payload.data
     phase.value = 'polling'
     schedulePoll(250)
@@ -252,7 +258,7 @@ async function retrySingle(item, index) {
   if (!file) return
   singleRetrying.value = new Set(singleRetrying.value).add(item.recordId)
   try {
-    const payload = await uploadDetect(file, settings.value)
+    const payload = await uploadDetect(file, {...settings.value, materialBatch: taskMaterialBatch.value})
     completedResults.value = [payload.data, ...completedResults.value.filter(result => result.recordId !== payload.data.recordId)]
     ElMessage.success(`${item.imageName} 已重新识别`)
   } catch (error) {

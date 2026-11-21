@@ -9,7 +9,6 @@
 
       <nav class="primary-nav" aria-label="主要导航">
         <router-link to="/detect">在线识别</router-link>
-        <router-link to="/boards">板材地图</router-link>
         <router-link to="/camera-detect">摄像头</router-link>
         <router-link to="/history">历史记录</router-link>
       </nav>
